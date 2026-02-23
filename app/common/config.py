@@ -21,5 +21,5 @@ BACKUP_CHECK_INTERVAL_MS = 60000  # 60 seconds
 BACKUP_HOUR = 2  # 2:00 AM
 
 # App info
-APP_NAME = '超市收银系统'
+APP_NAME = '收银系统'
 APP_VERSION = '1.0.0'

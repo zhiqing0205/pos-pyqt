@@ -56,6 +56,31 @@ class ProductModel:
         return rows
 
     @staticmethod
+    def get_categories():
+        """Get all distinct categories."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT DISTINCT category FROM products WHERE is_active = 1 AND category != '' ORDER BY category"
+        )
+        rows = [r['category'] for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    @staticmethod
+    def get_by_category(category):
+        """Get all active products in a category."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT * FROM products WHERE is_active = 1 AND category = ? ORDER BY name",
+            (category,)
+        )
+        rows = [dict(r) for r in cursor.fetchall()]
+        conn.close()
+        return rows
+
+    @staticmethod
     def create(barcode, name, category='', purchase_price=0, selling_price=0,
                stock_quantity=0, unit='个'):
         now = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
