@@ -50,15 +50,16 @@ class MainWindow(FluentWindow):
             self.addSubInterface(self.stockInInterface, FIF.ADD_TO, '进货管理')
             self.addSubInterface(self.userInterface, FIF.PEOPLE, '用户管理')
 
-        # Backup button at bottom
-        self.navigationInterface.addItem(
-            routeKey='backup',
-            icon=FIF.SAVE,
-            text='备份管理',
-            onClick=self._show_backup_dialog,
-            selectable=False,
-            position=NavigationItemPosition.BOTTOM,
-        )
+        # Backup button at bottom (admin only)
+        if AuthManager.is_admin():
+            self.navigationInterface.addItem(
+                routeKey='backup',
+                icon=FIF.SAVE,
+                text='备份管理',
+                onClick=self._show_backup_dialog,
+                selectable=False,
+                position=NavigationItemPosition.BOTTOM,
+            )
 
     def _init_window(self):
         role_text = '管理员' if AuthManager.is_admin() else '店员'

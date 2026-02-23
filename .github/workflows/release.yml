@@ -15,13 +15,13 @@ jobs:
         include:
           - os: windows-latest
             artifact: pos-pyqt-windows-x64
-            exe_name: 超市收银系统.exe
-          - os: macos-14            # Apple Silicon (M1/M2)
+            archive_ext: zip
+          - os: macos-14
             artifact: pos-pyqt-macos-arm64
-            exe_name: 超市收银系统
+            archive_ext: tar.gz
           - os: ubuntu-22.04
             artifact: pos-pyqt-linux-x64
-            exe_name: 超市收银系统
+            archive_ext: tar.gz
 
     runs-on: ${{ matrix.os }}
 
@@ -33,7 +33,6 @@ jobs:
         with:
           python-version: '3.11'
 
-      # Linux: install system dependencies for Qt
       - name: Install Linux dependencies
         if: runner.os == 'Linux'
         run: |
@@ -47,10 +46,37 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
-      - name: Build with PyInstaller
+      - name: Build with PyInstaller (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
         run: |
           pyinstaller --noconfirm --clean \
-            --name "${{ matrix.exe_name }}" \
+            --name "pos-pyqt" \
+            --windowed \
+            --add-data "app;app" \
+            --hidden-import qfluentwidgets \
+            --hidden-import qfluentwidgets.components \
+            --hidden-import qfluentwidgets._rc \
+            --collect-all qfluentwidgets \
+            main.py
+
+      - name: Build with PyInstaller (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          pyinstaller --noconfirm --clean \
+            --name "pos-pyqt" \
+            --add-data "app:app" \
+            --hidden-import qfluentwidgets \
+            --hidden-import qfluentwidgets.components \
+            --hidden-import qfluentwidgets._rc \
+            --collect-all qfluentwidgets \
+            main.py
+
+      - name: Build with PyInstaller (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          pyinstaller --noconfirm --clean \
+            --name "pos-pyqt" \
             --windowed \
             --add-data "app:app" \
             --hidden-import qfluentwidgets \
@@ -62,13 +88,13 @@ jobs:
       - name: Package (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path "dist/${{ matrix.exe_name }}/*" -DestinationPath "${{ matrix.artifact }}.zip"
+        run: Compress-Archive -Path "dist/pos-pyqt/*" -DestinationPath "${{ matrix.artifact }}.zip"
 
       - name: Package (macOS/Linux)
         if: runner.os != 'Windows'
         run: |
           cd dist
-          tar czf "../${{ matrix.artifact }}.tar.gz" "${{ matrix.exe_name }}"
+          tar czf "../${{ matrix.artifact }}.tar.gz" pos-pyqt
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
@@ -84,9 +110,6 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
-
-      - name: List files
-        run: ls -la
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

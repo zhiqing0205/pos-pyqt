@@ -1,6 +1,6 @@
-# 超市收银库存系统
+# 收银库存系统
 
-基于 PyQt5 + [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) 的超市收银库存管理系统。
+基于 PyQt5 + [PyQt-Fluent-Widgets](https://github.com/zhiyiYo/PyQt-Fluent-Widgets) 的收银库存管理系统。
 
 ![Python](https://img.shields.io/badge/Python-3.8+-blue)
 ![PyQt5](https://img.shields.io/badge/PyQt5-5.15-green)
@@ -29,9 +29,9 @@
 
 前往 [Releases](https://github.com/zhiqing0205/pos-pyqt/releases) 下载对应平台的压缩包，解压后运行：
 
-- **Windows**: 双击 `超市收银系统.exe`
-- **macOS (Apple Silicon)**: 运行 `超市收银系统`
-- **Linux**: 运行 `./超市收银系统`
+- **Windows**: 双击 `pos-pyqt.exe`
+- **macOS (Apple Silicon)**: 运行 `pos-pyqt`
+- **Linux**: 运行 `./pos-pyqt`
 
 ### 从源码运行
 
@@ -58,7 +58,7 @@ python main.py
 | 商品管理 | ✓ | — |
 | 进货管理 | ✓ | — |
 | 用户管理 | ✓ | — |
-| 备份管理 | ✓ | ✓ |
+| 备份管理 | ✓ | — |
 
 ## 技术栈
 
