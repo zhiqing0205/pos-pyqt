@@ -15,13 +15,10 @@ jobs:
         include:
           - os: windows-latest
             artifact: pos-pyqt-windows-x64
-            archive_ext: zip
           - os: macos-14
             artifact: pos-pyqt-macos-arm64
-            archive_ext: tar.gz
           - os: ubuntu-22.04
             artifact: pos-pyqt-linux-x64
-            archive_ext: tar.gz
 
     runs-on: ${{ matrix.os }}
 
@@ -46,6 +43,8 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      # ── Build ──
+
       - name: Build with PyInstaller (Windows)
         if: runner.os == 'Windows'
         shell: bash
@@ -53,6 +52,7 @@ jobs:
           pyinstaller --noconfirm --clean \
             --name "pos-pyqt" \
             --windowed \
+            --icon NONE \
             --add-data "app;app" \
             --hidden-import qfluentwidgets \
             --hidden-import qfluentwidgets.components \
@@ -65,6 +65,7 @@ jobs:
         run: |
           pyinstaller --noconfirm --clean \
             --name "pos-pyqt" \
+            --windowed \
             --add-data "app:app" \
             --hidden-import qfluentwidgets \
             --hidden-import qfluentwidgets.components \
@@ -85,22 +86,79 @@ jobs:
             --collect-all qfluentwidgets \
             main.py
 
-      - name: Package (Windows)
+      # ── Package ──
+
+      # Windows: portable zip
+      - name: Package portable zip (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path "dist/pos-pyqt/*" -DestinationPath "${{ matrix.artifact }}.zip"
+        run: Compress-Archive -Path "dist/pos-pyqt/*" -DestinationPath "${{ matrix.artifact }}-portable.zip"
 
-      - name: Package (macOS/Linux)
-        if: runner.os != 'Windows'
+      # Windows: installer via Inno Setup
+      - name: Create installer (Windows)
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          cat > installer.iss << 'INNO_EOF'
+          [Setup]
+          AppName=pos-pyqt
+          AppVersion=${{ github.ref_name }}
+          DefaultDirName={autopf}\pos-pyqt
+          DefaultGroupName=pos-pyqt
+          OutputDir=.
+          OutputBaseFilename=${{ matrix.artifact }}-setup
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64compatible
+          ArchitecturesInstallIn64BitMode=x64compatible
+          UninstallDisplayIcon={app}\pos-pyqt.exe
+
+          [Files]
+          Source: "dist\pos-pyqt\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs
+
+          [Icons]
+          Name: "{group}\pos-pyqt"; Filename: "{app}\pos-pyqt.exe"
+          Name: "{autodesktop}\pos-pyqt"; Filename: "{app}\pos-pyqt.exe"; Tasks: desktopicon
+
+          [Tasks]
+          Name: "desktopicon"; Description: "Create a desktop shortcut"; GroupDescription: "Additional icons:"
+          INNO_EOF
+          iscc installer.iss
+
+      # macOS: zip (from .app bundle)
+      - name: Package zip (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r -y "../${{ matrix.artifact }}.zip" pos-pyqt.app
+
+      # macOS: dmg
+      - name: Package dmg (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          mkdir -p dmg_content
+          cp -R dist/pos-pyqt.app dmg_content/
+          ln -s /Applications dmg_content/Applications
+          hdiutil create -volname "pos-pyqt" -srcfolder dmg_content -ov -format UDZO "${{ matrix.artifact }}.dmg"
+
+      # Linux: tar.gz
+      - name: Package tar.gz (Linux)
+        if: runner.os == 'Linux'
         run: |
           cd dist
           tar czf "../${{ matrix.artifact }}.tar.gz" pos-pyqt
 
-      - name: Upload artifact
+      # ── Upload ──
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: ${{ matrix.artifact }}.*
+          path: |
+            ${{ matrix.artifact }}*.zip
+            ${{ matrix.artifact }}*.tar.gz
+            ${{ matrix.artifact }}*.dmg
+            ${{ matrix.artifact }}*.exe
 
   release:
     needs: build
@@ -111,11 +169,16 @@ jobs:
         with:
           merge-multiple: true
 
+      - name: List files
+        run: ls -la
+
       - name: Create Release
         uses: softprops/action-gh-release@v2
         with:
           generate_release_notes: true
           files: |
-            pos-pyqt-windows-x64.zip
-            pos-pyqt-macos-arm64.tar.gz
+            pos-pyqt-windows-x64-portable.zip
+            pos-pyqt-windows-x64-setup.exe
+            pos-pyqt-macos-arm64.zip
+            pos-pyqt-macos-arm64.dmg
             pos-pyqt-linux-x64.tar.gz
