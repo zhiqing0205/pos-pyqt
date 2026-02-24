@@ -1,87 +1,97 @@
 # coding: utf-8
-from PyQt5.QtCore import Qt, QTimer
+from PyQt5.QtCore import Qt, QTimer, QEvent
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QHeaderView,
-                              QTableWidgetItem, QAbstractItemView)
+                              QTableWidgetItem, QAbstractItemView, QApplication)
 
-from qfluentwidgets import (SearchLineEdit, LineEdit, PushButton, PrimaryPushButton,
-                            TableWidget, SimpleCardWidget, BodyLabel,
-                            SubtitleLabel, InfoBar, InfoBarPosition,
+from qfluentwidgets import (TableWidget, SimpleCardWidget, BodyLabel,
+                            SubtitleLabel, CaptionLabel, InfoBar, InfoBarPosition,
                             FluentIcon as FIF, setFont)
 
 from ..models.product import ProductModel
 from ..models.stock_in import StockInModel
 from ..common.auth import AuthManager
 from ..common.signal_bus import signal_bus
+from ..dialogs.stock_in_dialog import StockInDialog
 
 
 class StockInInterface(QWidget):
-    """Stock-in management interface."""
+    """Stock-in management interface with barcode scanning."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
-        self._current_product = None
+        self._barcode_buffer = ''
+        self._barcode_timer = QTimer(self)
+        self._barcode_timer.setSingleShot(True)
+        self._barcode_timer.setInterval(100)
+        self._barcode_timer.timeout.connect(self._flush_barcode_buffer)
         self._init_ui()
         self._load_records()
 
         signal_bus.stock_changed.connect(self._load_records)
+
+        QTimer.singleShot(200, self._install_global_filter)
+
+    def _install_global_filter(self):
+        top = self.window()
+        if top:
+            top.installEventFilter(self)
+
+    def eventFilter(self, obj, event):
+        """Capture barcode scans when this interface is visible."""
+        if not self.isVisible():
+            return False
+
+        if event.type() == QEvent.KeyPress:
+            focused = QApplication.focusWidget()
+            if (focused and focused is not self
+                    and hasattr(focused, 'text')
+                    and callable(getattr(focused, 'setText', None))):
+                return False
+
+            key = event.key()
+            text = event.text()
+
+            if key in (Qt.Key_Return, Qt.Key_Enter):
+                if self._barcode_buffer:
+                    self._process_barcode(self._barcode_buffer.strip())
+                    self._barcode_buffer = ''
+                    self._barcode_timer.stop()
+                    return True
+            elif text and text.isprintable() and key not in (
+                Qt.Key_Escape, Qt.Key_Tab, Qt.Key_Backspace,
+                Qt.Key_F1, Qt.Key_F2, Qt.Key_F3, Qt.Key_F4,
+                Qt.Key_F5, Qt.Key_F6, Qt.Key_F7, Qt.Key_F8,
+                Qt.Key_F9, Qt.Key_F10, Qt.Key_F11, Qt.Key_F12,
+                Qt.Key_Delete,
+            ):
+                self._barcode_buffer += text
+                self._barcode_timer.start()
+                return True
+
+        return False
+
+    def _flush_barcode_buffer(self):
+        self._barcode_buffer = ''
 
     def _init_ui(self):
         layout = QVBoxLayout(self)
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(10)
 
-        # === Input card ===
-        input_card = SimpleCardWidget(self)
-        card_layout = QVBoxLayout(input_card)
-        card_layout.setContentsMargins(20, 15, 20, 15)
-        card_layout.setSpacing(10)
+        # === Hint card ===
+        hint_card = SimpleCardWidget(self)
+        hint_layout = QVBoxLayout(hint_card)
+        hint_layout.setContentsMargins(25, 20, 25, 20)
+        hint_layout.setSpacing(8)
 
-        card_title = SubtitleLabel('商品入库')
-        card_layout.addWidget(card_title)
+        hint_title = SubtitleLabel('商品入库')
+        hint_layout.addWidget(hint_title)
 
-        # Barcode scan row
-        scan_layout = QHBoxLayout()
-        scan_layout.setSpacing(10)
+        hint_text = BodyLabel('请扫描商品条码，系统将自动弹出入库窗口')
+        hint_text.setStyleSheet('color: gray;')
+        hint_layout.addWidget(hint_text)
 
-        self.barcodeEdit = SearchLineEdit()
-        self.barcodeEdit.setPlaceholderText('扫描或输入商品条码...')
-        self.barcodeEdit.setFixedHeight(36)
-        scan_layout.addWidget(self.barcodeEdit, 1)
-
-        card_layout.addLayout(scan_layout)
-
-        # Product info display
-        self.productInfoLabel = BodyLabel('请先扫描商品条码')
-        self.productInfoLabel.setStyleSheet('color: gray;')
-        card_layout.addWidget(self.productInfoLabel)
-
-        # Quantity and price row
-        qty_price_layout = QHBoxLayout()
-        qty_price_layout.setSpacing(15)
-
-        qty_price_layout.addWidget(BodyLabel('进货数量:'))
-        self.quantityEdit = LineEdit()
-        self.quantityEdit.setPlaceholderText('数量')
-        self.quantityEdit.setFixedWidth(100)
-        qty_price_layout.addWidget(self.quantityEdit)
-
-        qty_price_layout.addWidget(BodyLabel('进价:'))
-        self.priceEdit = LineEdit()
-        self.priceEdit.setPlaceholderText('单价')
-        self.priceEdit.setFixedWidth(100)
-        qty_price_layout.addWidget(self.priceEdit)
-
-        qty_price_layout.addWidget(BodyLabel('备注:'))
-        self.noteEdit = LineEdit()
-        self.noteEdit.setPlaceholderText('备注（可选）')
-        qty_price_layout.addWidget(self.noteEdit, 1)
-
-        self.confirmBtn = PrimaryPushButton(FIF.ADD, '确认入库')
-        qty_price_layout.addWidget(self.confirmBtn)
-
-        card_layout.addLayout(qty_price_layout)
-
-        layout.addWidget(input_card)
+        layout.addWidget(hint_card)
 
         # === Records table ===
         records_title = SubtitleLabel('进货记录')
@@ -109,80 +119,43 @@ class StockInInterface(QWidget):
 
         layout.addWidget(self.table, 1)
 
-        # === Connections ===
-        self.barcodeEdit.returnPressed.connect(self._on_barcode_enter)
-        self.confirmBtn.clicked.connect(self._on_confirm)
-
-    def _on_barcode_enter(self):
-        barcode = self.barcodeEdit.text().strip()
+    def _process_barcode(self, barcode):
         if not barcode:
             return
 
         product = ProductModel.get_by_barcode(barcode)
-        if product:
-            self._current_product = product
-            self.productInfoLabel.setText(
-                '商品: {} | 当前库存: {} | 售价: ¥{:.2f}'.format(
-                    product['name'], product['stock_quantity'],
-                    product['selling_price']))
-            self.productInfoLabel.setStyleSheet('color: #2e7d32;')
-            self.priceEdit.setText('{:.2f}'.format(product['purchase_price']))
-            self.quantityEdit.setFocus()
-        else:
-            self._current_product = None
-            self.productInfoLabel.setText('未找到条码 {} 对应的商品'.format(barcode))
-            self.productInfoLabel.setStyleSheet('color: #d32f2f;')
-
-    def _on_confirm(self):
-        if not self._current_product:
-            InfoBar.warning(
-                title='提示', content='请先扫描有效的商品条码',
-                parent=self, position=InfoBarPosition.TOP, duration=2000)
+        if not product:
+            InfoBar.error(
+                title='商品未找到',
+                content='条码 {} 未在商品库中，请先在商品管理中添加'.format(barcode),
+                parent=self, position=InfoBarPosition.TOP, duration=4000)
             return
 
-        try:
-            quantity = int(self.quantityEdit.text())
-            price = float(self.priceEdit.text())
-            if quantity <= 0 or price < 0:
-                raise ValueError
-        except (ValueError, TypeError):
-            InfoBar.error(
-                title='输入错误', content='请输入有效的数量和价格',
-                parent=self, position=InfoBarPosition.TOP, duration=2000)
-            return
-
-        user = AuthManager.current_user()
-        result = StockInModel.create(
-            product_id=self._current_product['id'],
-            barcode=self._current_product['barcode'],
-            product_name=self._current_product['name'],
-            quantity=quantity,
-            purchase_price=price,
-            operator_id=user['id'],
-            note=self.noteEdit.text().strip()
-        )
-
-        if result:
-            InfoBar.success(
-                title='入库成功',
-                content='{} 入库 {} 件'.format(
-                    self._current_product['name'], quantity),
-                parent=self, position=InfoBarPosition.TOP, duration=3000)
-            self._current_product = None
-            self.barcodeEdit.clear()
-            self.quantityEdit.clear()
-            self.priceEdit.clear()
-            self.noteEdit.clear()
-            self.productInfoLabel.setText('请先扫描商品条码')
-            self.productInfoLabel.setStyleSheet('color: gray;')
-            self._load_records()
-            signal_bus.stock_changed.emit()
-            signal_bus.product_changed.emit()
-            self.barcodeEdit.setFocus()
-        else:
-            InfoBar.error(
-                title='入库失败', content='操作失败，请重试',
-                parent=self, position=InfoBarPosition.TOP, duration=3000)
+        dialog = StockInDialog(product, self.window())
+        if dialog.exec_():
+            user = AuthManager.current_user()
+            result = StockInModel.create(
+                product_id=product['id'],
+                barcode=product['barcode'],
+                product_name=product['name'],
+                quantity=dialog.get_quantity(),
+                purchase_price=dialog.get_price(),
+                operator_id=user['id'],
+                note=dialog.get_note()
+            )
+            if result:
+                InfoBar.success(
+                    title='入库成功',
+                    content='{} 入库 {} 件'.format(
+                        product['name'], dialog.get_quantity()),
+                    parent=self, position=InfoBarPosition.TOP, duration=3000)
+                self._load_records()
+                signal_bus.stock_changed.emit()
+                signal_bus.product_changed.emit()
+            else:
+                InfoBar.error(
+                    title='入库失败', content='操作失败，请重试',
+                    parent=self, position=InfoBarPosition.TOP, duration=3000)
 
     def _load_records(self):
         records = StockInModel.get_recent(100)
