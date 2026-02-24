@@ -18,6 +18,7 @@ from .stock_in_interface import StockInInterface
 from .settings_interface import SettingsInterface
 from .backup_interface import BackupInterface
 from .dashboard_interface import DashboardInterface
+from .transaction_interface import TransactionInterface
 
 ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
@@ -37,6 +38,9 @@ class MainWindow(FluentWindow):
     def _init_interfaces(self):
         self.salesInterface = SalesInterface(self)
         self.salesInterface.setObjectName('sales-interface')
+
+        self.transactionInterface = TransactionInterface(self)
+        self.transactionInterface.setObjectName('transaction-interface')
 
         if AuthManager.is_admin():
             self.dashboardInterface = DashboardInterface(self)
@@ -59,6 +63,7 @@ class MainWindow(FluentWindow):
 
     def _init_navigation(self):
         self.addSubInterface(self.salesInterface, FIF.SHOPPING_CART, '收银')
+        self.addSubInterface(self.transactionInterface, FIF.HISTORY, '销售记录')
 
         if AuthManager.is_admin():
             self.addSubInterface(self.dashboardInterface, FIF.HOME, '仪表盘')
