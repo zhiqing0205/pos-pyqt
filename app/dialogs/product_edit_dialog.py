@@ -8,9 +8,10 @@ from qfluentwidgets import (MessageBoxBase, LineEdit, ComboBox, BodyLabel,
 class ProductEditDialog(MessageBoxBase):
     """Dialog for adding or editing a product."""
 
-    def __init__(self, product=None, parent=None):
+    def __init__(self, product=None, barcode=None, parent=None):
         super().__init__(parent)
         self._product = product
+        self._barcode = barcode
         self._result_data = None
         self._init_ui()
 
@@ -26,6 +27,9 @@ class ProductEditDialog(MessageBoxBase):
         self.barcodeEdit.setPlaceholderText('商品条码')
         if is_edit:
             self.barcodeEdit.setText(self._product['barcode'])
+        elif self._barcode:
+            self.barcodeEdit.setText(self._barcode)
+            self.barcodeEdit.setReadOnly(True)
         self.viewLayout.addWidget(self.barcodeEdit)
 
         self.viewLayout.addSpacing(5)
