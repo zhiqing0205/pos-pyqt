@@ -17,6 +17,7 @@ from .user_interface import UserInterface
 from .stock_in_interface import StockInInterface
 from .settings_interface import SettingsInterface
 from .backup_interface import BackupInterface
+from .dashboard_interface import DashboardInterface
 
 ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
@@ -38,6 +39,9 @@ class MainWindow(FluentWindow):
         self.salesInterface.setObjectName('sales-interface')
 
         if AuthManager.is_admin():
+            self.dashboardInterface = DashboardInterface(self)
+            self.dashboardInterface.setObjectName('dashboard-interface')
+
             self.productInterface = ProductInterface(self)
             self.productInterface.setObjectName('product-interface')
 
@@ -57,6 +61,7 @@ class MainWindow(FluentWindow):
         self.addSubInterface(self.salesInterface, FIF.SHOPPING_CART, '收银')
 
         if AuthManager.is_admin():
+            self.addSubInterface(self.dashboardInterface, FIF.HOME, '仪表盘')
             self.addSubInterface(self.productInterface, FIF.TAG, '商品管理')
             self.addSubInterface(self.stockInInterface, FIF.ADD_TO, '进货管理')
             self.addSubInterface(self.userInterface, FIF.PEOPLE, '用户管理')
