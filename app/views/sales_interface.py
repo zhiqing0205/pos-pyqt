@@ -45,7 +45,7 @@ class ProductButton(PushButton):
                 background: white;
                 font-size: 13px;
                 text-align: center;
-                padding: 6px 8px;
+                padding: 2px 8px;
             }
             ProductButton:hover {
                 background: #e3f2fd;
@@ -154,7 +154,7 @@ class SalesInterface(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.Fixed)
-        self.cartTable.setColumnWidth(0, 32)
+        self.cartTable.setColumnWidth(0, 40)
         self.cartTable.setColumnWidth(3, 120)
         self.cartTable.setColumnWidth(6, 60)
 

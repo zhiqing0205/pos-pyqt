@@ -16,7 +16,7 @@ from .product_interface import ProductInterface
 from .user_interface import UserInterface
 from .stock_in_interface import StockInInterface
 from .settings_interface import SettingsInterface
-from ..dialogs.backup_dialog import BackupDialog
+from .backup_interface import BackupInterface
 
 ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
@@ -50,6 +50,9 @@ class MainWindow(FluentWindow):
             self.settingsInterface = SettingsInterface(self)
             self.settingsInterface.setObjectName('settings-interface')
 
+            self.backupInterface = BackupInterface(self._backup_manager, self)
+            self.backupInterface.setObjectName('backup-interface')
+
     def _init_navigation(self):
         self.addSubInterface(self.salesInterface, FIF.SHOPPING_CART, '收银')
 
@@ -62,14 +65,9 @@ class MainWindow(FluentWindow):
                 self.settingsInterface, FIF.SETTING, '支付设置',
                 NavigationItemPosition.BOTTOM)
 
-            self.navigationInterface.addItem(
-                routeKey='backup',
-                icon=FIF.SAVE,
-                text='备份管理',
-                onClick=self._show_backup_dialog,
-                selectable=False,
-                position=NavigationItemPosition.BOTTOM,
-            )
+            self.addSubInterface(
+                self.backupInterface, FIF.SAVE, '备份管理',
+                NavigationItemPosition.BOTTOM)
 
     def _init_window(self):
         role_text = '管理员' if AuthManager.is_admin() else '店员'
@@ -86,10 +84,8 @@ class MainWindow(FluentWindow):
         w, h = desktop.width(), desktop.height()
         self.move(w // 2 - self.width() // 2, h // 2 - self.height() // 2)
 
-    def _show_backup_dialog(self):
-        dialog = BackupDialog(self._backup_manager, self)
-        dialog.exec_()
-
     def closeEvent(self, event):
+        if self._backup_manager.should_backup_on_close():
+            self._backup_manager.create_backup(prefix='close')
         AuthManager.logout()
         super().closeEvent(event)

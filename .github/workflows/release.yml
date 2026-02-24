@@ -25,6 +25,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Extract version
+        id: version
+        shell: bash
+        run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
@@ -92,7 +97,7 @@ jobs:
       - name: Package portable zip (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
-        run: Compress-Archive -Path "dist/pos-pyqt/*" -DestinationPath "${{ matrix.artifact }}-portable.zip"
+        run: Compress-Archive -Path "dist/pos-pyqt/*" -DestinationPath "${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}-portable.zip"
 
       # Windows: installer via Inno Setup
       - name: Create installer (Windows)
@@ -106,7 +111,7 @@ jobs:
           DefaultDirName={autopf}\pos-pyqt
           DefaultGroupName=pos-pyqt
           OutputDir=.
-          OutputBaseFilename=${{ matrix.artifact }}-setup
+          OutputBaseFilename=${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}-setup
           Compression=lzma2
           SolidCompression=yes
           ArchitecturesAllowed=x64compatible
@@ -130,7 +135,7 @@ jobs:
         if: runner.os == 'macOS'
         run: |
           cd dist
-          zip -r -y "../${{ matrix.artifact }}.zip" pos-pyqt.app
+          zip -r -y "../${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.zip" pos-pyqt.app
 
       # macOS: dmg
       - name: Package dmg (macOS)
@@ -139,14 +144,14 @@ jobs:
           mkdir -p dmg_content
           cp -R dist/pos-pyqt.app dmg_content/
           ln -s /Applications dmg_content/Applications
-          hdiutil create -volname "pos-pyqt" -srcfolder dmg_content -ov -format UDZO "${{ matrix.artifact }}.dmg"
+          hdiutil create -volname "pos-pyqt" -srcfolder dmg_content -ov -format UDZO "${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.dmg"
 
       # Linux: tar.gz
       - name: Package tar.gz (Linux)
         if: runner.os == 'Linux'
         run: |
           cd dist
-          tar czf "../${{ matrix.artifact }}.tar.gz" pos-pyqt
+          tar czf "../${{ matrix.artifact }}-${{ steps.version.outputs.VERSION }}.tar.gz" pos-pyqt
 
       # ── Upload ──
 
@@ -177,8 +182,7 @@ jobs:
         with:
           generate_release_notes: true
           files: |
-            pos-pyqt-windows-x64-portable.zip
-            pos-pyqt-windows-x64-setup.exe
-            pos-pyqt-macos-arm64.zip
-            pos-pyqt-macos-arm64.dmg
-            pos-pyqt-linux-x64.tar.gz
+            *.zip
+            *.tar.gz
+            *.dmg
+            *.exe

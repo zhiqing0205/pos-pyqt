@@ -37,8 +37,10 @@ class SettingsInterface(QWidget):
         scroll = QScrollArea()
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet('QScrollArea { background: transparent; }')
 
         container = QWidget()
+        container.setStyleSheet('QWidget { background: transparent; }')
         layout = QVBoxLayout(container)
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(15)
