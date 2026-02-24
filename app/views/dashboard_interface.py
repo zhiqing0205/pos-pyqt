@@ -1,9 +1,7 @@
 # coding: utf-8
-import math
-from PyQt5.QtCore import Qt, QRectF, QTimer
+from PyQt5.QtCore import Qt, QRectF
 from PyQt5.QtGui import QPainter, QColor, QPen, QFont, QFontMetrics, QPainterPath
-from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-                              QScrollArea, QFrame, QSizePolicy)
+from PyQt5.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QFrame
 
 from qfluentwidgets import (SimpleCardWidget, SubtitleLabel, BodyLabel,
                             TitleLabel, CaptionLabel, setFont,
@@ -251,9 +249,9 @@ class DashboardInterface(QWidget):
         layout.setContentsMargins(20, 10, 20, 10)
         layout.setSpacing(15)
 
-        # ── Stat Cards Row ──
-        cards_layout = QHBoxLayout()
-        cards_layout.setSpacing(12)
+        # ── Row 1: Today Stat Cards ──
+        cards1 = QHBoxLayout()
+        cards1.setSpacing(12)
 
         self.todaySalesCard = StatCard('今日交易笔数', '0',
                                        color='#0078D4')
@@ -261,43 +259,90 @@ class DashboardInterface(QWidget):
                                           color='#00B294')
         self.todayItemsCard = StatCard('今日售出件数', '0',
                                         color='#E74856')
+        self.avgOrderCard = StatCard('今日客单价', '¥0.00',
+                                      color='#8764B8')
+
+        cards1.addWidget(self.todaySalesCard)
+        cards1.addWidget(self.todayRevenueCard)
+        cards1.addWidget(self.todayItemsCard)
+        cards1.addWidget(self.avgOrderCard)
+
+        layout.addLayout(cards1)
+
+        # ── Row 2: Monthly / Inventory Stat Cards ──
+        cards2 = QHBoxLayout()
+        cards2.setSpacing(12)
+
+        self.monthSalesCard = StatCard('本月交易笔数', '0',
+                                        color='#0078D4')
+        self.monthRevenueCard = StatCard('本月营业额', '¥0.00',
+                                           color='#00B294')
+        self.inventoryCard = StatCard('库存总价值', '¥0.00',
+                                       color='#F7630C')
         self.productCard = StatCard('商品总数', '0',
                                      subtitle='库存不足: 0', color='#FFB900')
 
-        cards_layout.addWidget(self.todaySalesCard)
-        cards_layout.addWidget(self.todayRevenueCard)
-        cards_layout.addWidget(self.todayItemsCard)
-        cards_layout.addWidget(self.productCard)
+        cards2.addWidget(self.monthSalesCard)
+        cards2.addWidget(self.monthRevenueCard)
+        cards2.addWidget(self.inventoryCard)
+        cards2.addWidget(self.productCard)
 
-        layout.addLayout(cards_layout)
+        layout.addLayout(cards2)
 
-        # ── Charts Row ──
-        charts_layout = QHBoxLayout()
-        charts_layout.setSpacing(12)
+        # ── Row 3: Revenue Bar Chart + Category Pie ──
+        charts1 = QHBoxLayout()
+        charts1.setSpacing(12)
 
-        # Bar chart: 7-day sales
         bar_card = SimpleCardWidget()
-        bar_layout = QVBoxLayout(bar_card)
-        bar_layout.setContentsMargins(10, 10, 10, 10)
+        bar_inner = QVBoxLayout(bar_card)
+        bar_inner.setContentsMargins(10, 10, 10, 10)
         self.barChart = BarChartWidget()
-        bar_layout.addWidget(self.barChart)
-        charts_layout.addWidget(bar_card, 3)
+        bar_inner.addWidget(self.barChart)
+        charts1.addWidget(bar_card, 3)
 
-        # Pie chart: category sales
         pie_card = SimpleCardWidget()
-        pie_layout = QVBoxLayout(pie_card)
-        pie_layout.setContentsMargins(10, 10, 10, 10)
-        self.pieChart = PieChartWidget()
-        pie_layout.addWidget(self.pieChart)
-        charts_layout.addWidget(pie_card, 2)
+        pie_inner = QVBoxLayout(pie_card)
+        pie_inner.setContentsMargins(10, 10, 10, 10)
+        self.categoryPieChart = PieChartWidget()
+        pie_inner.addWidget(self.categoryPieChart)
+        charts1.addWidget(pie_card, 2)
 
-        layout.addLayout(charts_layout)
+        layout.addLayout(charts1)
 
-        # ── Bottom Row: top products + low stock ──
+        # ── Row 4: Payment Pie + Recent Transactions ──
+        charts2 = QHBoxLayout()
+        charts2.setSpacing(12)
+
+        pay_card = SimpleCardWidget()
+        pay_inner = QVBoxLayout(pay_card)
+        pay_inner.setContentsMargins(10, 10, 10, 10)
+        self.paymentPieChart = PieChartWidget()
+        pay_inner.addWidget(self.paymentPieChart)
+        charts2.addWidget(pay_card, 2)
+
+        recent_card = SimpleCardWidget()
+        recent_inner = QVBoxLayout(recent_card)
+        recent_inner.setContentsMargins(20, 15, 20, 15)
+        recent_inner.setSpacing(8)
+
+        recent_title = SubtitleLabel('最近交易')
+        recent_inner.addWidget(recent_title)
+
+        self.recentTxnWidget = QWidget()
+        self.recentTxnLayout = QVBoxLayout(self.recentTxnWidget)
+        self.recentTxnLayout.setContentsMargins(0, 0, 0, 0)
+        self.recentTxnLayout.setSpacing(6)
+        recent_inner.addWidget(self.recentTxnWidget)
+        recent_inner.addStretch()
+
+        charts2.addWidget(recent_card, 3)
+
+        layout.addLayout(charts2)
+
+        # ── Row 5: Top Products + Low Stock ──
         bottom_layout = QHBoxLayout()
         bottom_layout.setSpacing(12)
 
-        # Top products
         top_card = SimpleCardWidget()
         top_layout_inner = QVBoxLayout(top_card)
         top_layout_inner.setContentsMargins(20, 15, 20, 15)
@@ -315,7 +360,6 @@ class DashboardInterface(QWidget):
 
         bottom_layout.addWidget(top_card, 1)
 
-        # Low stock
         low_card = SimpleCardWidget()
         low_layout_inner = QVBoxLayout(low_card)
         low_layout_inner.setContentsMargins(20, 15, 20, 15)
@@ -340,7 +384,7 @@ class DashboardInterface(QWidget):
         outer.addWidget(scroll)
 
     def _load_data(self):
-        # Stat cards
+        # ── Row 1: Today stat cards ──
         sales = StatsModel.today_sales()
         self.todaySalesCard.setValue(str(sales['count']))
         self.todayRevenueCard.setValue('¥{:.2f}'.format(sales['revenue']))
@@ -348,35 +392,87 @@ class DashboardInterface(QWidget):
         items_sold = StatsModel.today_items_sold()
         self.todayItemsCard.setValue(str(items_sold))
 
+        avg_val = StatsModel.avg_order_value()
+        self.avgOrderCard.setValue('¥{:.2f}'.format(avg_val))
+
+        # ── Row 2: Monthly / Inventory stat cards ──
+        monthly = StatsModel.monthly_sales()
+        self.monthSalesCard.setValue(str(monthly['count']))
+        self.monthRevenueCard.setValue('¥{:.2f}'.format(monthly['revenue']))
+
+        inv_val = StatsModel.inventory_value()
+        self.inventoryCard.setValue('¥{:.0f}'.format(inv_val))
+
         product_info = StatsModel.product_summary()
         self.productCard.setValue(str(product_info['total']))
         self.productCard.setSubtitle(
             '库存不足: {}'.format(product_info['low_stock']))
 
-        # Bar chart: 7-day sales
+        # ── Row 3: Bar chart + Category pie ──
         daily = StatsModel.sales_last_7_days()
         self.barChart.setData(
             [{'label': d['date'], 'value': d['revenue']} for d in daily],
             title='近7天营业额'
         )
 
-        # Pie chart: category or payment
         cat_sales = StatsModel.category_sales()
         if cat_sales:
-            self.pieChart.setData(
+            self.categoryPieChart.setData(
                 [{'label': c['category'], 'value': c['total']}
                  for c in cat_sales],
                 title='近30天分类销售'
             )
         else:
-            payment = StatsModel.payment_method_stats()
-            self.pieChart.setData(
+            self.categoryPieChart.setData([], title='近30天分类销售')
+
+        # ── Row 4: Payment pie + Recent transactions ──
+        payment = StatsModel.payment_method_stats()
+        if payment:
+            self.paymentPieChart.setData(
                 [{'label': _PAYMENT_NAMES.get(p['method'], p['method']),
                   'value': p['total']} for p in payment],
                 title='支付方式分布'
             )
+        else:
+            self.paymentPieChart.setData([], title='支付方式分布')
 
-        # Top products list
+        self._clear_layout(self.recentTxnLayout)
+        recent = StatsModel.recent_transactions(10)
+        if recent:
+            for t in recent:
+                row = QHBoxLayout()
+                row.setSpacing(8)
+
+                time_str = t['created_at'][5:16] if len(t['created_at']) >= 16 else t['created_at']
+                time_label = CaptionLabel(time_str)
+                time_label.setStyleSheet('color: #999;')
+                time_label.setFixedWidth(90)
+                row.addWidget(time_label)
+
+                user = CaptionLabel(t.get('username', '') or '')
+                user.setStyleSheet('color: #666;')
+                user.setFixedWidth(60)
+                row.addWidget(user)
+
+                method = _PAYMENT_NAMES.get(t['payment_method'], t['payment_method'])
+                method_label = CaptionLabel(method)
+                method_label.setStyleSheet('color: #666;')
+                method_label.setFixedWidth(55)
+                row.addWidget(method_label)
+
+                row.addStretch()
+
+                amount = CaptionLabel('¥{:.2f}'.format(t['final_amount']))
+                amount.setStyleSheet('color: #d32f2f; font-weight: bold;')
+                row.addWidget(amount)
+
+                self.recentTxnLayout.addLayout(row)
+        else:
+            hint = CaptionLabel('暂无交易记录')
+            hint.setStyleSheet('color: gray;')
+            self.recentTxnLayout.addWidget(hint)
+
+        # ── Row 5: Top products list ──
         self._clear_layout(self.topProductsLayout)
         top = StatsModel.top_products(8)
         if top:

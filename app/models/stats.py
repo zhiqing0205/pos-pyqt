@@ -144,3 +144,82 @@ class StatsModel:
                  'total': r['total']} for r in cur.fetchall()]
         conn.close()
         return rows
+
+    @staticmethod
+    def monthly_sales():
+        """Return current month's transaction count and revenue."""
+        month = datetime.now().strftime('%Y-%m')
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COUNT(*) as cnt, COALESCE(SUM(final_amount), 0) as total "
+            "FROM transactions WHERE created_at LIKE ?",
+            (month + '%',)
+        )
+        row = cur.fetchone()
+        conn.close()
+        return {'count': row['cnt'], 'revenue': row['total']}
+
+    @staticmethod
+    def avg_order_value():
+        """Return today's average order value."""
+        today = datetime.now().strftime('%Y-%m-%d')
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COALESCE(AVG(final_amount), 0) as avg_val "
+            "FROM transactions WHERE created_at LIKE ?",
+            (today + '%',)
+        )
+        row = cur.fetchone()
+        conn.close()
+        return row['avg_val']
+
+    @staticmethod
+    def inventory_value():
+        """Return total inventory value (stock * selling_price)."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT COALESCE(SUM(stock_quantity * selling_price), 0) as total "
+            "FROM products WHERE is_active = 1"
+        )
+        row = cur.fetchone()
+        conn.close()
+        return row['total']
+
+    @staticmethod
+    def recent_transactions(limit=10):
+        """Return the most recent transactions with basic info."""
+        conn = get_connection()
+        cur = conn.cursor()
+        cur.execute(
+            "SELECT t.transaction_no, t.final_amount, t.payment_method, "
+            "t.created_at, u.username "
+            "FROM transactions t "
+            "LEFT JOIN users u ON t.user_id = u.id "
+            "ORDER BY t.id DESC LIMIT ?",
+            (limit,)
+        )
+        rows = [dict(r) for r in cur.fetchall()]
+        conn.close()
+        return rows
+
+    @staticmethod
+    def sales_last_7_days_count():
+        """Return daily transaction count for the last 7 days."""
+        results = []
+        for i in range(6, -1, -1):
+            day = (datetime.now() - timedelta(days=i)).strftime('%Y-%m-%d')
+            conn = get_connection()
+            cur = conn.cursor()
+            cur.execute(
+                "SELECT COUNT(*) as cnt FROM transactions "
+                "WHERE created_at LIKE ?",
+                (day + '%',)
+            )
+            row = cur.fetchone()
+            conn.close()
+            label = (datetime.now() - timedelta(days=i)).strftime('%m/%d')
+            results.append({'date': label, 'count': row['cnt']})
+        return results
