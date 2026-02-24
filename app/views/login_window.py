@@ -12,7 +12,7 @@ from qfluentwidgets import (LineEdit, PasswordLineEdit, PrimaryPushButton,
                             FluentIcon as FIF)
 
 from ..common.auth import AuthManager
-from ..common.config import APP_NAME, BASE_DIR
+from ..common.config import APP_NAME, APP_VERSION, BASE_DIR
 
 ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
@@ -89,6 +89,12 @@ class LoginWindow(QWidget):
             row.addStretch()
             left_layout.addLayout(row)
             left_layout.addSpacing(6)
+
+        left_layout.addStretch()
+
+        version_label = CaptionLabel('v' + APP_VERSION)
+        version_label.setStyleSheet('color: rgba(255,255,255,0.5);')
+        left_layout.addWidget(version_label)
 
         outer.addWidget(left)
 
