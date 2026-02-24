@@ -1,4 +1,6 @@
 # coding: utf-8
+import os
+
 from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
@@ -6,14 +8,17 @@ from PyQt5.QtWidgets import QApplication
 from qfluentwidgets import FluentWindow, NavigationItemPosition
 from qfluentwidgets import FluentIcon as FIF
 
-from ..common.config import APP_NAME
+from ..common.config import APP_NAME, BASE_DIR
 from ..common.auth import AuthManager
 from ..common.backup import BackupManager
 from .sales_interface import SalesInterface
 from .product_interface import ProductInterface
 from .user_interface import UserInterface
 from .stock_in_interface import StockInInterface
+from .settings_interface import SettingsInterface
 from ..dialogs.backup_dialog import BackupDialog
+
+ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
 
 class MainWindow(FluentWindow):
@@ -42,6 +47,9 @@ class MainWindow(FluentWindow):
             self.userInterface = UserInterface(self)
             self.userInterface.setObjectName('user-interface')
 
+            self.settingsInterface = SettingsInterface(self)
+            self.settingsInterface.setObjectName('settings-interface')
+
     def _init_navigation(self):
         self.addSubInterface(self.salesInterface, FIF.SHOPPING_CART, '收银')
 
@@ -50,8 +58,10 @@ class MainWindow(FluentWindow):
             self.addSubInterface(self.stockInInterface, FIF.ADD_TO, '进货管理')
             self.addSubInterface(self.userInterface, FIF.PEOPLE, '用户管理')
 
-        # Backup button at bottom (admin only)
-        if AuthManager.is_admin():
+            self.addSubInterface(
+                self.settingsInterface, FIF.SETTING, '支付设置',
+                NavigationItemPosition.BOTTOM)
+
             self.navigationInterface.addItem(
                 routeKey='backup',
                 icon=FIF.SAVE,
@@ -65,6 +75,10 @@ class MainWindow(FluentWindow):
         role_text = '管理员' if AuthManager.is_admin() else '店员'
         self.setWindowTitle('{} - {} ({})'.format(
             APP_NAME, self._user_info['username'], role_text))
+
+        if os.path.exists(ICON_PATH):
+            self.setWindowIcon(QIcon(ICON_PATH))
+
         self.resize(1200, 800)
         self.setMinimumSize(960, 640)
 

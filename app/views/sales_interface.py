@@ -1,22 +1,26 @@
 # coding: utf-8
 from PyQt5.QtCore import Qt, QTimer, QEvent
-from PyQt5.QtGui import QFont, QKeySequence, QColor
+from PyQt5.QtGui import QFont, QKeySequence, QColor, QFontMetrics
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QHeaderView,
                               QTableWidgetItem, QShortcut, QAbstractItemView,
                               QGridLayout, QSizePolicy, QScrollArea, QFrame,
-                              QGraphicsDropShadowEffect, QApplication)
+                              QGraphicsDropShadowEffect, QApplication, QLabel)
 
 from qfluentwidgets import (PushButton, PrimaryPushButton, TransparentPushButton,
                             TableWidget, SimpleCardWidget, SubtitleLabel,
                             BodyLabel, TitleLabel, CaptionLabel,
                             InfoBar, InfoBarPosition,
-                            setFont, FluentIcon as FIF, PillPushButton)
+                            setFont, FluentIcon as FIF, PillPushButton,
+                            ToolButton)
 
 from ..models.product import ProductModel
 from ..dialogs.checkout_dialog import CheckoutDialog
 from ..dialogs.discount_dialog import DiscountDialog
 from ..common.auth import AuthManager
 from ..common.signal_bus import signal_bus
+
+# Preferred category display order (listed ones come first, rest alphabetical)
+_CATEGORY_ORDER = ['饮料', '水', '奶品', '酒', '方便面', '零食', '日用品']
 
 
 class ProductButton(PushButton):
@@ -25,16 +29,24 @@ class ProductButton(PushButton):
     def __init__(self, product, parent=None):
         super().__init__(parent)
         self.product = product
-        self.setText('{}\n¥{:.2f}'.format(product['name'], product['selling_price']))
-        self.setFixedSize(110, 60)
+        self.setFixedSize(110, 62)
+        self.setToolTip('{}\n¥{:.2f}'.format(product['name'], product['selling_price']))
+
+        # Elide the name if too long
+        name = product['name']
+        fm = QFontMetrics(self.font())
+        max_w = 96  # button width minus padding
+        elided = fm.elidedText(name, Qt.ElideRight, max_w)
+        self.setText('{}\n¥{:.2f}'.format(elided, product['selling_price']))
+
         self.setStyleSheet('''
             ProductButton {
                 border: 1px solid #e0e0e0;
                 border-radius: 6px;
                 background: white;
                 font-size: 12px;
-                text-align: center;
-                padding: 4px;
+                text-align: left;
+                padding: 6px 7px;
             }
             ProductButton:hover {
                 background: #e3f2fd;
@@ -65,7 +77,6 @@ class SalesInterface(QWidget):
 
         signal_bus.product_changed.connect(self._load_categories)
 
-        # Install event filter on the top-level window to capture barcode globally
         QTimer.singleShot(200, self._install_global_filter)
 
     def _install_global_filter(self):
@@ -76,10 +87,8 @@ class SalesInterface(QWidget):
     def eventFilter(self, obj, event):
         """Capture keyboard input globally for barcode scanning."""
         if event.type() == QEvent.KeyPress:
-            # Only intercept when no dialog / line-edit has focus
             focused = QApplication.focusWidget()
             if focused and focused is not self and hasattr(focused, 'text') and callable(getattr(focused, 'setText', None)):
-                # A text input has focus — don't intercept
                 return False
 
             key = event.key()
@@ -105,7 +114,6 @@ class SalesInterface(QWidget):
         return False
 
     def _flush_barcode_buffer(self):
-        """Timer expired without Enter — clear partial buffer."""
         self._barcode_buffer = ''
 
     # ── UI Setup ──
@@ -153,47 +161,45 @@ class SalesInterface(QWidget):
 
         left.addWidget(self.cartTable, 1)
 
-        # Summary card
+        # ── Summary card (larger) ──
         self.summaryCard = SimpleCardWidget(self)
+        self.summaryCard.setFixedHeight(100)
         summary_layout = QHBoxLayout(self.summaryCard)
-        summary_layout.setContentsMargins(16, 12, 16, 12)
-        summary_layout.setSpacing(20)
+        summary_layout.setContentsMargins(24, 14, 24, 14)
+        summary_layout.setSpacing(0)
 
-        count_vbox = QVBoxLayout()
-        count_vbox.setSpacing(2)
-        self.countTitleLabel = CaptionLabel('数量')
-        self.countValueLabel = SubtitleLabel('0')
-        count_vbox.addWidget(self.countTitleLabel)
-        count_vbox.addWidget(self.countValueLabel)
-        summary_layout.addLayout(count_vbox)
+        # Helper to create each summary column
+        def make_summary_col(title_text, default_value, font_size=20):
+            vbox = QVBoxLayout()
+            vbox.setSpacing(4)
+            title = CaptionLabel(title_text)
+            setFont(title, 13)
+            value = SubtitleLabel(default_value)
+            setFont(value, font_size)
+            vbox.addWidget(title, 0, Qt.AlignCenter)
+            vbox.addWidget(value, 0, Qt.AlignCenter)
+            return vbox, value
 
-        total_vbox = QVBoxLayout()
-        total_vbox.setSpacing(2)
-        self.totalTitleLabel = CaptionLabel('总额')
-        self.totalValueLabel = SubtitleLabel('¥0.00')
-        total_vbox.addWidget(self.totalTitleLabel)
-        total_vbox.addWidget(self.totalValueLabel)
-        summary_layout.addLayout(total_vbox)
+        col1, self.countValueLabel = make_summary_col('商品数量', '0')
+        summary_layout.addLayout(col1, 1)
 
-        discount_vbox = QVBoxLayout()
-        discount_vbox.setSpacing(2)
-        self.discountTitleLabel = CaptionLabel('优惠')
-        self.discountValueLabel = SubtitleLabel('¥0.00')
-        discount_vbox.addWidget(self.discountTitleLabel)
-        discount_vbox.addWidget(self.discountValueLabel)
-        summary_layout.addLayout(discount_vbox)
+        col2, self.totalValueLabel = make_summary_col('商品总额', '¥0.00')
+        summary_layout.addLayout(col2, 1)
 
-        summary_layout.addStretch()
+        col3, self.discountValueLabel = make_summary_col('折扣优惠', '¥0.00')
+        summary_layout.addLayout(col3, 1)
 
+        # Final amount — bigger and red
         final_vbox = QVBoxLayout()
-        final_vbox.setSpacing(2)
-        self.finalTitleLabel = CaptionLabel('应收')
+        final_vbox.setSpacing(4)
+        final_title = CaptionLabel('应收金额')
+        setFont(final_title, 13)
         self.finalValueLabel = TitleLabel('¥0.00')
-        setFont(self.finalValueLabel, 30)
+        setFont(self.finalValueLabel, 32)
         self.finalValueLabel.setStyleSheet('color: #d32f2f;')
-        final_vbox.addWidget(self.finalTitleLabel, 0, Qt.AlignRight)
-        final_vbox.addWidget(self.finalValueLabel, 0, Qt.AlignRight)
-        summary_layout.addLayout(final_vbox)
+        final_vbox.addWidget(final_title, 0, Qt.AlignCenter)
+        final_vbox.addWidget(self.finalValueLabel, 0, Qt.AlignCenter)
+        summary_layout.addLayout(final_vbox, 2)
 
         left.addWidget(self.summaryCard)
 
@@ -220,7 +226,7 @@ class SalesInterface(QWidget):
         right = QVBoxLayout()
         right.setSpacing(6)
 
-        # Category tabs (horizontal scroll)
+        # Category tabs
         self.categoryScroll = QScrollArea()
         self.categoryScroll.setWidgetResizable(True)
         self.categoryScroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
@@ -237,7 +243,7 @@ class SalesInterface(QWidget):
 
         right.addWidget(self.categoryScroll)
 
-        # Product grid (scrollable)
+        # Product grid
         self.productScroll = QScrollArea()
         self.productScroll.setWidgetResizable(True)
         self.productScroll.setFrameShape(QFrame.NoFrame)
@@ -266,9 +272,23 @@ class SalesInterface(QWidget):
 
     # ── Category & Product Grid ──
 
+    def _sorted_categories(self, categories):
+        """Sort categories: preferred order first, then alphabetical for the rest."""
+        ordered = []
+        remaining = []
+        for cat in _CATEGORY_ORDER:
+            if cat in categories:
+                ordered.append(cat)
+        for cat in categories:
+            if cat not in ordered:
+                remaining.append(cat)
+        remaining.sort()
+        return ordered + remaining
+
     def _load_categories(self):
-        categories = ProductModel.get_categories()
-        # Clear old buttons
+        raw = ProductModel.get_categories()
+        categories = self._sorted_categories(raw)
+
         while self.categoryLayout.count():
             item = self.categoryLayout.takeAt(0)
             if item.widget():
@@ -292,7 +312,6 @@ class SalesInterface(QWidget):
     def _select_category(self, category):
         self._current_category = category
 
-        # Update tab highlight
         for i in range(self.categoryLayout.count()):
             item = self.categoryLayout.itemAt(i)
             if item and item.widget() and isinstance(item.widget(), PillPushButton):
@@ -300,7 +319,6 @@ class SalesInterface(QWidget):
                 is_selected = (category is None and btn.text() == '全部') or (btn.text() == category)
                 btn.setChecked(is_selected)
 
-        # Load products
         if category is None:
             products = ProductModel.get_all()
         else:
@@ -308,7 +326,6 @@ class SalesInterface(QWidget):
         self._display_product_grid(products)
 
     def _display_product_grid(self, products):
-        # Clear grid
         while self.productGrid.count():
             item = self.productGrid.takeAt(0)
             if item.widget():
@@ -320,7 +337,6 @@ class SalesInterface(QWidget):
             btn.clicked.connect(lambda checked, product=p: self._add_product_to_cart(product))
             self.productGrid.addWidget(btn, i // cols, i % cols)
 
-        # Fill remaining space
         row_count = (len(products) + cols - 1) // cols
         spacer = QWidget()
         spacer.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Expanding)
@@ -329,27 +345,20 @@ class SalesInterface(QWidget):
     # ── Cart Operations ──
 
     def _process_barcode(self, barcode):
-        """Handle a scanned/entered barcode."""
         if not barcode:
             return
-
         product = ProductModel.get_by_barcode(barcode)
         if not product:
             InfoBar.error(
                 title='商品未找到',
                 content='条码 {} 未找到对应商品'.format(barcode),
-                parent=self,
-                position=InfoBarPosition.TOP,
-                duration=3000
-            )
+                parent=self, position=InfoBarPosition.TOP, duration=3000)
             self.statusLabel.setText('未找到: {}'.format(barcode))
             self.statusLabel.setStyleSheet('color: #d32f2f;')
             return
-
         self._add_product_to_cart(product)
 
     def _add_product_to_cart(self, product):
-        """Add a product to the cart (or increment if already present)."""
         for item in self._cart_items:
             if item['product_id'] == product['id']:
                 item['quantity'] += 1
@@ -380,18 +389,19 @@ class SalesInterface(QWidget):
             self.cartTable.setItem(i, 1, QTableWidgetItem(item['name']))
             self.cartTable.setItem(i, 2, QTableWidgetItem('{:.2f}'.format(item['unit_price'])))
 
-            # Quantity with +/- buttons
+            # Quantity with styled +/- buttons
             qty_widget = QWidget()
             qty_layout = QHBoxLayout(qty_widget)
             qty_layout.setContentsMargins(2, 2, 2, 2)
             qty_layout.setSpacing(3)
 
-            minus_btn = PushButton('-')
+            minus_btn = ToolButton(FIF.REMOVE, self)
             minus_btn.setFixedSize(26, 26)
             qty_label = BodyLabel(str(item['quantity']))
             qty_label.setAlignment(Qt.AlignCenter)
             qty_label.setFixedWidth(30)
-            plus_btn = PushButton('+')
+            setFont(qty_label, 14)
+            plus_btn = ToolButton(FIF.ADD, self)
             plus_btn.setFixedSize(26, 26)
 
             row = i
@@ -407,8 +417,23 @@ class SalesInterface(QWidget):
             self.cartTable.setItem(i, 4, QTableWidgetItem(discount_text))
             self.cartTable.setItem(i, 5, QTableWidgetItem('{:.2f}'.format(item['subtotal'])))
 
-            del_btn = PushButton(FIF.DELETE, '')
+            # Red delete button
+            del_btn = ToolButton(FIF.DELETE, self)
             del_btn.setFixedSize(32, 28)
+            del_btn.setStyleSheet('''
+                ToolButton {
+                    background: transparent;
+                    border: none;
+                    border-radius: 4px;
+                }
+                ToolButton:hover {
+                    background: #ffebee;
+                }
+                ToolButton:pressed {
+                    background: #ffcdd2;
+                }
+            ''')
+            del_btn.setIconSize(del_btn.size() * 0.55)
             del_btn.clicked.connect(lambda checked, r=row: self._remove_item(r))
             del_widget = QWidget()
             del_layout = QHBoxLayout(del_widget)
@@ -416,7 +441,6 @@ class SalesInterface(QWidget):
             del_layout.addWidget(del_btn)
             self.cartTable.setCellWidget(i, 6, del_widget)
 
-        # Scroll to bottom to show latest item
         if self._cart_items:
             self.cartTable.scrollToBottom()
 

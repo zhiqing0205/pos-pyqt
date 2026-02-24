@@ -52,7 +52,7 @@ jobs:
           pyinstaller --noconfirm --clean \
             --name "pos-pyqt" \
             --windowed \
-            --icon NONE \
+            --icon "app/resources/icon.ico" \
             --add-data "app;app" \
             --hidden-import qfluentwidgets \
             --hidden-import qfluentwidgets.components \

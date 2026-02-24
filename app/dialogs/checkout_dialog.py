@@ -6,6 +6,7 @@ from qfluentwidgets import (MessageBoxBase, ComboBox, LineEdit, BodyLabel,
                             TitleLabel, SubtitleLabel, setFont)
 
 from ..models.transaction import TransactionModel
+from ..models.settings import SettingsModel
 from ..common.auth import AuthManager
 
 
@@ -20,14 +21,19 @@ class CheckoutDialog(MessageBoxBase):
         self._discount_amount = discount_amount
         self._cart_items = cart_items
 
+        # Build available payment methods
+        self._methods = [('现金', 'cash')]
+        if SettingsModel.is_alipay_configured():
+            self._methods.append(('支付宝', 'alipay'))
+        if SettingsModel.is_wechat_configured():
+            self._methods.append(('微信', 'wechat'))
+
         self._init_ui()
 
     def _init_ui(self):
-        # Title
         title = TitleLabel('结账')
         self.viewLayout.addWidget(title)
 
-        # Amount display
         amount_label = BodyLabel('应收金额')
         self.viewLayout.addWidget(amount_label)
 
@@ -38,18 +44,16 @@ class CheckoutDialog(MessageBoxBase):
 
         self.viewLayout.addSpacing(15)
 
-        # Payment method
         method_label = BodyLabel('付款方式')
         self.viewLayout.addWidget(method_label)
 
         self.methodCombo = ComboBox()
-        self.methodCombo.addItems(['现金', '支付宝', '微信'])
+        self.methodCombo.addItems([m[0] for m in self._methods])
         self.methodCombo.setFixedWidth(200)
         self.viewLayout.addWidget(self.methodCombo)
 
         self.viewLayout.addSpacing(10)
 
-        # Payment amount / reference
         self.payLabel = BodyLabel('收款金额')
         self.viewLayout.addWidget(self.payLabel)
 
@@ -59,39 +63,42 @@ class CheckoutDialog(MessageBoxBase):
         self.payEdit.setFixedWidth(200)
         self.viewLayout.addWidget(self.payEdit)
 
-        # Change display
         self.changeLabel = BodyLabel('')
         self.viewLayout.addWidget(self.changeLabel)
 
         self.viewLayout.addSpacing(10)
 
-        # Set button texts
         self.yesButton.setText('确认结账')
         self.cancelButton.setText('取消')
 
-        # Connections
         self.methodCombo.currentIndexChanged.connect(self._on_method_changed)
         self.payEdit.textChanged.connect(self._update_change)
 
-        # Set dialog width
         self.widget.setMinimumWidth(360)
 
         self._update_change()
 
+    def _current_method_key(self):
+        idx = self.methodCombo.currentIndex()
+        if 0 <= idx < len(self._methods):
+            return self._methods[idx][1]
+        return 'cash'
+
     def _on_method_changed(self, index):
-        if index == 0:  # Cash
+        key = self._current_method_key()
+        if key == 'cash':
             self.payLabel.setText('收款金额')
             self.payEdit.setPlaceholderText('输入收款金额')
             self.payEdit.setText('{:.2f}'.format(self._final_amount))
             self.changeLabel.show()
-        else:  # Alipay / WeChat
+        else:
             self.payLabel.setText('支付凭证号')
             self.payEdit.setPlaceholderText('输入凭证号（可选）')
             self.payEdit.clear()
             self.changeLabel.hide()
 
     def _update_change(self):
-        if self.methodCombo.currentIndex() != 0:
+        if self._current_method_key() != 'cash':
             return
         try:
             paid = float(self.payEdit.text())
@@ -106,7 +113,7 @@ class CheckoutDialog(MessageBoxBase):
             self.changeLabel.setText('')
 
     def _validate(self):
-        if self.methodCombo.currentIndex() == 0:  # Cash
+        if self._current_method_key() == 'cash':
             try:
                 paid = float(self.payEdit.text())
                 if paid < self._final_amount:
@@ -116,12 +123,10 @@ class CheckoutDialog(MessageBoxBase):
         return True
 
     def accept(self):
-        """Override accept to process the transaction."""
         if not self._validate():
             return
 
-        methods = ['cash', 'alipay', 'wechat']
-        method = methods[self.methodCombo.currentIndex()]
+        method = self._current_method_key()
         payment_ref = ''
         if method != 'cash':
             payment_ref = self.payEdit.text().strip()

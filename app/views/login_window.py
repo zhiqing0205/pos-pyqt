@@ -1,6 +1,8 @@
 # coding: utf-8
+import os
+
 from PyQt5.QtCore import Qt, pyqtSignal
-from PyQt5.QtGui import QFont, QColor
+from PyQt5.QtGui import QFont, QColor, QIcon
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QLabel,
                               QApplication, QGraphicsDropShadowEffect)
 
@@ -10,7 +12,9 @@ from qfluentwidgets import (LineEdit, PasswordLineEdit, PrimaryPushButton,
                             FluentIcon as FIF)
 
 from ..common.auth import AuthManager
-from ..common.config import APP_NAME
+from ..common.config import APP_NAME, BASE_DIR
+
+ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
 
 class LoginWindow(QWidget):
@@ -21,6 +25,8 @@ class LoginWindow(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setWindowTitle(APP_NAME)
+        if os.path.exists(ICON_PATH):
+            self.setWindowIcon(QIcon(ICON_PATH))
         self.setFixedSize(860, 520)
         self.setWindowFlags(Qt.Window | Qt.WindowCloseButtonHint)
         self._init_ui()
