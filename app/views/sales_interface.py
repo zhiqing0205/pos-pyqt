@@ -146,6 +146,8 @@ class SalesInterface(QWidget):
         self.cartTable.verticalHeader().hide()
         self.cartTable.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.cartTable.setSelectionBehavior(QAbstractItemView.SelectRows)
+        self.cartTable.setStyleSheet(
+            'QTableView::item { padding-left: 8px; padding-right: 8px; }')
 
         header = self.cartTable.horizontalHeader()
         header.setSectionResizeMode(0, QHeaderView.Fixed)

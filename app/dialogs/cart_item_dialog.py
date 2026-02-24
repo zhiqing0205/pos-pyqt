@@ -1,8 +1,10 @@
 # coding: utf-8
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import QHBoxLayout
 
 from qfluentwidgets import (MessageBoxBase, LineEdit, BodyLabel,
-                            SubtitleLabel, PushButton, FluentIcon as FIF)
+                            SubtitleLabel, PushButton, FluentIcon as FIF,
+                            setCustomStyleSheet)
 
 
 class CartItemDialog(MessageBoxBase):
@@ -43,10 +45,10 @@ class CartItemDialog(MessageBoxBase):
         self.viewLayout.addSpacing(10)
 
         self.deleteBtn = PushButton(FIF.DELETE, '删除此商品')
-        self.deleteBtn.setStyleSheet(
-            'PushButton { color: #d32f2f; border-color: #d32f2f; }'
-            'PushButton:hover { background: #ffebee; }'
-        )
+        self.deleteBtn.setIcon(FIF.DELETE.icon(color=QColor('#d32f2f')))
+        qss = 'PushButton { color: #d32f2f; border: 1px solid #d32f2f; }'
+        qss_dark = 'PushButton { color: #ef5350; border: 1px solid #ef5350; }'
+        setCustomStyleSheet(self.deleteBtn, qss, qss_dark)
         self.deleteBtn.clicked.connect(self._on_delete)
         self.viewLayout.addWidget(self.deleteBtn)
 
