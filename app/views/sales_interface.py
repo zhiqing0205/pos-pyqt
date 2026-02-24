@@ -362,6 +362,22 @@ class SalesInterface(QWidget):
         self._add_product_to_cart(product)
 
     def _add_product_to_cart(self, product):
+        stock = product['stock_quantity']
+        # Calculate how many are already in cart
+        in_cart = 0
+        for item in self._cart_items:
+            if item['product_id'] == product['id']:
+                in_cart = item['quantity']
+                break
+
+        if in_cart + 1 > stock:
+            InfoBar.error(
+                title='库存不足',
+                content='{} 库存仅 {} 件，购物车已有 {} 件'.format(
+                    product['name'], stock, in_cart),
+                parent=self, position=InfoBarPosition.TOP, duration=3000)
+            return
+
         for item in self._cart_items:
             if item['product_id'] == product['id']:
                 item['quantity'] += 1
@@ -459,6 +475,16 @@ class SalesInterface(QWidget):
             if new_qty <= 0:
                 self._remove_item(row)
                 return
+            # Check stock when increasing
+            if delta > 0:
+                product = ProductModel.get_by_id(item['product_id'])
+                if product and new_qty > product['stock_quantity']:
+                    InfoBar.error(
+                        title='库存不足',
+                        content='{} 库存仅 {} 件'.format(
+                            item['name'], product['stock_quantity']),
+                        parent=self, position=InfoBarPosition.TOP, duration=3000)
+                    return
             item['quantity'] = new_qty
             item['subtotal'] = round(
                 item['unit_price'] * item['quantity'] * item['discount_rate'], 2)
@@ -490,7 +516,18 @@ class SalesInterface(QWidget):
             action = dialog.get_action()
             if action == CartItemDialog.RESULT_DELETE:
                 self._remove_item(row)
-            elif action == CartItemDialog.RESULT_DISCOUNT:
+            elif action == CartItemDialog.RESULT_UPDATE:
+                new_qty = dialog.get_quantity()
+                # Check stock
+                product = ProductModel.get_by_id(item['product_id'])
+                if product and new_qty > product['stock_quantity']:
+                    InfoBar.error(
+                        title='库存不足',
+                        content='{} 库存仅 {} 件'.format(
+                            item['name'], product['stock_quantity']),
+                        parent=self, position=InfoBarPosition.TOP, duration=3000)
+                    return
+                item['quantity'] = new_qty
                 item['discount_rate'] = dialog.get_discount_rate()
                 item['subtotal'] = round(
                     item['unit_price'] * item['quantity'] * item['discount_rate'], 2)
@@ -536,6 +573,23 @@ class SalesInterface(QWidget):
                 title='提示', content='购物车为空，无法结账',
                 parent=self, position=InfoBarPosition.TOP, duration=2000)
             return
+
+        # Verify stock for all items before checkout
+        for item in self._cart_items:
+            product = ProductModel.get_by_id(item['product_id'])
+            if not product:
+                InfoBar.error(
+                    title='商品不存在',
+                    content='{} 已被删除，请移除后重试'.format(item['name']),
+                    parent=self, position=InfoBarPosition.TOP, duration=3000)
+                return
+            if item['quantity'] > product['stock_quantity']:
+                InfoBar.error(
+                    title='库存不足',
+                    content='{} 库存仅 {} 件，购物车中有 {} 件'.format(
+                        item['name'], product['stock_quantity'], item['quantity']),
+                    parent=self, position=InfoBarPosition.TOP, duration=4000)
+                return
 
         total_amount = sum(
             item['unit_price'] * item['quantity'] for item in self._cart_items)
