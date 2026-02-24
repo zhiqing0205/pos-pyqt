@@ -87,3 +87,23 @@ class TransactionModel:
         rows = [dict(r) for r in cursor.fetchall()]
         conn.close()
         return rows
+
+    @staticmethod
+    def delete(transaction_id):
+        """Delete a transaction and its items."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            cursor.execute(
+                "DELETE FROM transaction_items WHERE transaction_id = ?",
+                (transaction_id,))
+            cursor.execute(
+                "DELETE FROM transactions WHERE id = ?",
+                (transaction_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            conn.rollback()
+            conn.close()
+            return False

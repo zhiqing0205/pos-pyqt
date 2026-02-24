@@ -1,10 +1,12 @@
 # coding: utf-8
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QColor
 from PyQt5.QtWidgets import (QWidget, QVBoxLayout, QHBoxLayout, QHeaderView,
                               QTableWidgetItem, QAbstractItemView)
 
 from qfluentwidgets import (SearchLineEdit, TableWidget, InfoBar, InfoBarPosition,
-                            FluentIcon as FIF, CaptionLabel)
+                            FluentIcon as FIF, CaptionLabel, ToolButton, MessageBox,
+                            setCustomStyleSheet)
 
 from ..models.transaction import TransactionModel
 from ..dialogs.transaction_detail_dialog import TransactionDetailDialog
@@ -43,7 +45,7 @@ class TransactionInterface(QWidget):
         self.searchEdit.setFixedHeight(36)
         top_layout.addWidget(self.searchEdit, 1)
 
-        self.hintLabel = CaptionLabel('双击查看交易详情')
+        self.hintLabel = CaptionLabel('双击查看详情，选中后按 Delete 删除')
         self.hintLabel.setStyleSheet('color: gray;')
         top_layout.addWidget(self.hintLabel)
 
@@ -54,9 +56,9 @@ class TransactionInterface(QWidget):
         self.table.setBorderVisible(True)
         self.table.setBorderRadius(8)
         self.table.setWordWrap(False)
-        self.table.setColumnCount(7)
+        self.table.setColumnCount(8)
         self.table.setHorizontalHeaderLabels(
-            ['交易单号', '时间', '收银员', '商品总额', '优惠', '实收金额', '支付方式'])
+            ['交易单号', '时间', '收银员', '商品总额', '优惠', '实收金额', '支付方式', '操作'])
         self.table.verticalHeader().hide()
         self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
@@ -69,6 +71,8 @@ class TransactionInterface(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(7, QHeaderView.Fixed)
+        self.table.setColumnWidth(7, 60)
 
         layout.addWidget(self.table, 1)
 
@@ -76,6 +80,14 @@ class TransactionInterface(QWidget):
         self.searchEdit.returnPressed.connect(self._on_search)
         self.searchEdit.textChanged.connect(self._on_search_changed)
         self.table.doubleClicked.connect(self._on_double_click)
+
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key_Delete:
+            rows = self.table.selectionModel().selectedRows()
+            if rows:
+                self._on_delete(rows[0].row())
+                return
+        super().keyPressEvent(event)
 
     def _on_search_changed(self, text):
         if not text:
@@ -95,6 +107,14 @@ class TransactionInterface(QWidget):
         self._transactions = TransactionModel.get_recent(200)
         self._display_transactions(self._transactions)
 
+    def _get_displayed(self):
+        keyword = self.searchEdit.text().strip()
+        if keyword:
+            return [t for t in self._transactions
+                    if keyword.lower() in t.get('transaction_no', '').lower()
+                    or keyword.lower() in t.get('username', '').lower()]
+        return self._transactions
+
     def _display_transactions(self, transactions):
         self.table.setRowCount(len(transactions))
         for i, t in enumerate(transactions):
@@ -110,16 +130,39 @@ class TransactionInterface(QWidget):
             method = _PAYMENT_NAMES.get(t['payment_method'], t['payment_method'])
             self.table.setItem(i, 6, QTableWidgetItem(method))
 
+            # Delete button
+            del_btn = ToolButton(FIF.DELETE)
+            del_btn.setFixedSize(32, 32)
+            del_btn.setIconSize(del_btn.size() * 0.5)
+            qss = 'ToolButton { border: none; }'
+            setCustomStyleSheet(del_btn, qss, qss)
+            row_idx = i
+            del_btn.clicked.connect(
+                lambda checked, r=row_idx: self._on_delete(r))
+            self.table.setCellWidget(i, 7, del_btn)
+
+    def _on_delete(self, row):
+        displayed = self._get_displayed()
+        if not (0 <= row < len(displayed)):
+            return
+        txn = displayed[row]
+        w = MessageBox(
+            '确认删除',
+            '确定要删除交易 {} 吗？\n金额: ¥{:.2f}'.format(
+                txn['transaction_no'], txn['final_amount']),
+            self.window())
+        w.yesButton.setText('确认')
+        w.cancelButton.setText('取消')
+        if w.exec_():
+            TransactionModel.delete(txn['id'])
+            InfoBar.success(
+                title='成功', content='交易记录已删除',
+                parent=self, position=InfoBarPosition.TOP, duration=2000)
+            self._load_transactions()
+
     def _on_double_click(self, index):
         row = index.row()
-        # Get from displayed rows
-        keyword = self.searchEdit.text().strip()
-        if keyword:
-            displayed = [t for t in self._transactions
-                         if keyword.lower() in t.get('transaction_no', '').lower()
-                         or keyword.lower() in t.get('username', '').lower()]
-        else:
-            displayed = self._transactions
+        displayed = self._get_displayed()
 
         if 0 <= row < len(displayed):
             txn = displayed[row]

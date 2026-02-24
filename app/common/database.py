@@ -1,7 +1,8 @@
 # coding: utf-8
 import sqlite3
 import hashlib
-from datetime import datetime
+import random
+from datetime import datetime, timedelta
 
 from .config import DB_PATH
 
@@ -148,5 +149,126 @@ def init_database():
                 (barcode, name, cat, pp, sp, stock, unit, now, now)
             )
 
+    # Seed demo data if transactions table is empty
+    cursor.execute("SELECT COUNT(*) FROM transactions")
+    if cursor.fetchone()[0] == 0:
+        _seed_demo_data(cursor)
+
     conn.commit()
     conn.close()
+
+
+def _seed_demo_data(cursor):
+    """Seed demo users, stock-in records, and transactions."""
+    now = datetime.now()
+    now_str = now.strftime('%Y-%m-%d %H:%M:%S')
+
+    # ── Demo users ──
+    clerk_pwd = hashlib.sha256('123456'.encode()).hexdigest()
+    cursor.execute(
+        "INSERT OR IGNORE INTO users "
+        "(username, password, role, is_active, created_at, updated_at) "
+        "VALUES (?, ?, ?, 1, ?, ?)",
+        ('张店员', clerk_pwd, 'clerk', now_str, now_str)
+    )
+    cursor.execute(
+        "INSERT OR IGNORE INTO users "
+        "(username, password, role, is_active, created_at, updated_at) "
+        "VALUES (?, ?, ?, 1, ?, ?)",
+        ('李店员', clerk_pwd, 'clerk', now_str, now_str)
+    )
+
+    # Get user IDs
+    cursor.execute("SELECT id FROM users WHERE username = 'admin'")
+    admin_row = cursor.fetchone()
+    admin_id = admin_row[0] if admin_row else 1
+
+    cursor.execute("SELECT id FROM users WHERE username = '张店员'")
+    clerk1_row = cursor.fetchone()
+    clerk1_id = clerk1_row[0] if clerk1_row else 2
+
+    cursor.execute("SELECT id FROM users WHERE username = '李店员'")
+    clerk2_row = cursor.fetchone()
+    clerk2_id = clerk2_row[0] if clerk2_row else 3
+
+    # Get all active products
+    cursor.execute("SELECT id, barcode, name, purchase_price, selling_price FROM products WHERE is_active = 1")
+    products = [dict(zip(['id', 'barcode', 'name', 'purchase_price', 'selling_price'], r))
+                for r in cursor.fetchall()]
+    if not products:
+        return
+
+    # ── Stock-in records (past 7 days) ──
+    for i in range(10):
+        p = random.choice(products)
+        days_ago = random.randint(1, 7)
+        ts = (now - timedelta(days=days_ago, hours=random.randint(8, 18),
+                              minutes=random.randint(0, 59))).strftime('%Y-%m-%d %H:%M:%S')
+        qty = random.choice([20, 30, 50, 100])
+        operator = random.choice([admin_id, clerk1_id])
+        notes = random.choice(['', '日常补货', '批量采购', '供应商送货'])
+        total_cost = qty * p['purchase_price']
+        cursor.execute(
+            "INSERT INTO stock_in_records "
+            "(product_id, barcode, product_name, quantity, purchase_price, "
+            "total_cost, operator_id, note, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (p['id'], p['barcode'], p['name'], qty, p['purchase_price'],
+             total_cost, operator, notes, ts)
+        )
+
+    # ── Demo transactions (past 7 days) ──
+    payment_methods = ['cash', 'cash', 'cash', 'wechat', 'alipay']
+    operators = [admin_id, clerk1_id, clerk1_id, clerk2_id]
+
+    for day_offset in range(7, -1, -1):
+        day = now - timedelta(days=day_offset)
+        # 3-8 transactions per day
+        num_txns = random.randint(3, 8)
+        for _ in range(num_txns):
+            hour = random.randint(8, 21)
+            minute = random.randint(0, 59)
+            second = random.randint(0, 59)
+            ts = day.replace(hour=hour, minute=minute, second=second)
+            ts_str = ts.strftime('%Y-%m-%d %H:%M:%S')
+            txn_no = 'TXN' + ts.strftime('%Y%m%d%H%M%S') + '{:04d}'.format(random.randint(0, 9999))
+
+            user_id = random.choice(operators)
+            payment = random.choice(payment_methods)
+
+            # 1-5 items per transaction
+            num_items = random.randint(1, 5)
+            selected = random.sample(products, min(num_items, len(products)))
+
+            total_amount = 0
+            items = []
+            for p in selected:
+                qty = random.randint(1, 3)
+                discount_rate = random.choice([1.0, 1.0, 1.0, 0.9, 0.85])
+                subtotal = round(p['selling_price'] * qty * discount_rate, 2)
+                total_amount += p['selling_price'] * qty
+                items.append((p['id'], p['barcode'], p['name'],
+                              p['selling_price'], qty, discount_rate, subtotal))
+
+            total_amount = round(total_amount, 2)
+            final_amount = round(sum(it[6] for it in items), 2)
+            discount_amount = round(total_amount - final_amount, 2)
+
+            cursor.execute(
+                "INSERT INTO transactions "
+                "(transaction_no, user_id, total_amount, discount_amount, "
+                "final_amount, payment_method, payment_ref, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (txn_no, user_id, total_amount, discount_amount,
+                 final_amount, payment, '', ts_str)
+            )
+            txn_id = cursor.lastrowid
+
+            for p_id, barcode, name, price, qty, disc, sub in items:
+                cursor.execute(
+                    "INSERT INTO transaction_items "
+                    "(transaction_id, product_id, barcode, product_name, "
+                    "unit_price, quantity, discount_rate, subtotal) "
+                    "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    (txn_id, p_id, barcode, name, price, qty, disc, sub)
+                )

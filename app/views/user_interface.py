@@ -146,13 +146,18 @@ class UserInterface(QWidget):
         user = UserModel.get_by_id(user_id)
         if not user:
             return
-        w = MessageBox('确认删除', '确定要禁用用户 "{}" 吗？'.format(user['username']),
-                       self.window())
+        w = MessageBox(
+            '确认删除',
+            '确定要删除用户 "{}" 吗？\n\n该用户的销售记录和进货记录也将被一并删除。'.format(
+                user['username']),
+            self.window())
         w.yesButton.setText('确认')
         w.cancelButton.setText('取消')
         if w.exec_():
             UserModel.delete(user_id)
             InfoBar.success(
-                title='成功', content='用户已禁用',
+                title='成功', content='用户已删除',
                 parent=self, position=InfoBarPosition.TOP, duration=2000)
             self._load_users()
+            signal_bus.user_changed.emit()
+            signal_bus.transaction_completed.emit()

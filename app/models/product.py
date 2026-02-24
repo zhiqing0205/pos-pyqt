@@ -151,5 +151,38 @@ class ProductModel:
 
     @staticmethod
     def delete(product_id):
-        """Soft-delete."""
-        return ProductModel.update(product_id, is_active=0)
+        """Hard-delete a product and cascade delete related records."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            # Find transactions that will become empty after removing items
+            cursor.execute(
+                "SELECT DISTINCT transaction_id FROM transaction_items "
+                "WHERE product_id = ?", (product_id,))
+            affected_txn_ids = [r[0] for r in cursor.fetchall()]
+
+            cursor.execute(
+                "DELETE FROM transaction_items WHERE product_id = ?",
+                (product_id,))
+            cursor.execute(
+                "DELETE FROM stock_in_records WHERE product_id = ?",
+                (product_id,))
+
+            # Clean up transactions that now have no items
+            for txn_id in affected_txn_ids:
+                cursor.execute(
+                    "SELECT COUNT(*) FROM transaction_items WHERE transaction_id = ?",
+                    (txn_id,))
+                if cursor.fetchone()[0] == 0:
+                    cursor.execute(
+                        "DELETE FROM transactions WHERE id = ?", (txn_id,))
+
+            cursor.execute(
+                "DELETE FROM products WHERE id = ?", (product_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            conn.rollback()
+            conn.close()
+            return False

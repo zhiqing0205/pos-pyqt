@@ -229,8 +229,11 @@ class ProductInterface(QWidget):
         product = ProductModel.get_by_id(product_id)
         if not product:
             return
-        w = MessageBox('确认删除', '确定要删除商品 "{}" 吗？'.format(product['name']),
-                       self.window())
+        w = MessageBox(
+            '确认删除',
+            '确定要删除商品 "{}" 吗？\n\n相关的销售记录和进货记录也将被一并删除。'.format(
+                product['name']),
+            self.window())
         w.yesButton.setText('确认')
         w.cancelButton.setText('取消')
         if w.exec_():
@@ -240,3 +243,4 @@ class ProductInterface(QWidget):
                 parent=self, position=InfoBarPosition.TOP, duration=2000)
             self._load_products()
             signal_bus.product_changed.emit()
+            signal_bus.transaction_completed.emit()

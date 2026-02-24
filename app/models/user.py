@@ -95,5 +95,29 @@ class UserModel:
 
     @staticmethod
     def delete(user_id):
-        """Soft-delete: set is_active = 0."""
-        return UserModel.update(user_id, is_active=0)
+        """Hard-delete a user and cascade delete related records."""
+        conn = get_connection()
+        cursor = conn.cursor()
+        try:
+            # Delete transaction items for this user's transactions
+            cursor.execute(
+                "SELECT id FROM transactions WHERE user_id = ?", (user_id,))
+            txn_ids = [r[0] for r in cursor.fetchall()]
+            for txn_id in txn_ids:
+                cursor.execute(
+                    "DELETE FROM transaction_items WHERE transaction_id = ?",
+                    (txn_id,))
+            cursor.execute(
+                "DELETE FROM transactions WHERE user_id = ?", (user_id,))
+            cursor.execute(
+                "DELETE FROM stock_in_records WHERE operator_id = ?",
+                (user_id,))
+            cursor.execute(
+                "DELETE FROM users WHERE id = ?", (user_id,))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception:
+            conn.rollback()
+            conn.close()
+            return False
