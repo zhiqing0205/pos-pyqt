@@ -52,7 +52,8 @@ class LoginWindow(QWidget):
         left.setStyleSheet('background: transparent;')
         left_layout = QVBoxLayout(left)
         left_layout.setContentsMargins(50, 0, 30, 0)
-        left_layout.setAlignment(Qt.AlignCenter)
+
+        left_layout.addStretch()
 
         icon_label = QLabel()
         icon_label.setText(FIF.SHOPPING_CART.icon().name() if False else '')

@@ -10,7 +10,8 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, LineEdit,
                             TableWidget, SimpleCardWidget, BodyLabel,
                             SubtitleLabel, CaptionLabel, SpinBox,
                             CheckBox, InfoBar, InfoBarPosition,
-                            FluentIcon as FIF, MessageBox, setFont)
+                            FluentIcon as FIF, MessageBox, setFont,
+                            setCustomStyleSheet)
 
 from ..common.backup import BackupManager
 from ..common.config import BACKUP_DIR, MAX_BACKUPS
@@ -161,6 +162,14 @@ class BackupInterface(QWidget):
         btn_layout.addStretch()
 
         self.resetDemoBtn = PushButton(FIF.DELETE, '清除演示数据')
+        setCustomStyleSheet(self.resetDemoBtn,
+            'PushButton { color: #d13438; border: 1px solid #d13438; }'
+            'PushButton:hover { background: #d13438; color: white; }'
+            'PushButton:pressed { background: #a4262c; color: white; border: 1px solid #a4262c; }',
+            'PushButton { color: #ff6767; border: 1px solid #ff6767; }'
+            'PushButton:hover { background: #ff6767; color: black; }'
+            'PushButton:pressed { background: #d13438; color: white; border: 1px solid #d13438; }'
+        )
         btn_layout.addWidget(self.resetDemoBtn)
 
         ac_layout.addLayout(btn_layout)
