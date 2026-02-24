@@ -11,7 +11,7 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, TransparentPushButton
                             BodyLabel, TitleLabel, CaptionLabel,
                             InfoBar, InfoBarPosition,
                             setFont, FluentIcon as FIF, PillPushButton,
-                            ToolButton, SmoothScrollArea)
+                            ToolButton, SmoothScrollArea, SwitchButton)
 
 from ..models.product import ProductModel
 from ..dialogs.checkout_dialog import CheckoutDialog
@@ -65,6 +65,7 @@ class SalesInterface(QWidget):
         super().__init__(parent)
         self._cart_items = []
         self._discount_rate = 1.0
+        self._ignore_stock = True
         self._barcode_buffer = ''
         self._barcode_timer = QTimer(self)
         self._barcode_timer.setSingleShot(True)
@@ -211,6 +212,18 @@ class SalesInterface(QWidget):
 
         self.discountBtn = PushButton(FIF.LABEL, '折扣 F4')
         self.clearBtn = PushButton(FIF.DELETE, '清空')
+
+        # Ignore stock toggle
+        stock_toggle_layout = QHBoxLayout()
+        stock_toggle_layout.setSpacing(6)
+        stock_label = CaptionLabel('忽略库存')
+        stock_label.setStyleSheet('color: #666;')
+        self.stockSwitch = SwitchButton()
+        self.stockSwitch.setChecked(True)
+        self.stockSwitch.checkedChanged.connect(self._on_stock_toggle)
+        stock_toggle_layout.addWidget(stock_label)
+        stock_toggle_layout.addWidget(self.stockSwitch)
+
         self.checkoutBtn = PrimaryPushButton(FIF.SHOPPING_CART, '结账 F12')
         self.checkoutBtn.setFixedHeight(42)
         setFont(self.checkoutBtn, 15)
@@ -218,6 +231,8 @@ class SalesInterface(QWidget):
         btn_layout.addWidget(self.discountBtn)
         btn_layout.addWidget(self.clearBtn)
         btn_layout.addStretch()
+        btn_layout.addLayout(stock_toggle_layout)
+        btn_layout.addSpacing(12)
         btn_layout.addWidget(self.checkoutBtn)
 
         left.addLayout(btn_layout)
@@ -347,6 +362,26 @@ class SalesInterface(QWidget):
 
     # ── Cart Operations ──
 
+    def _on_stock_toggle(self, checked):
+        self._ignore_stock = checked
+
+    def _stock_warning(self, name, stock, cart_qty):
+        """Show stock warning or error depending on ignore mode.
+        Returns True if the operation should be blocked."""
+        msg = '{} 库存仅 {} 件，购物车中有 {} 件'.format(name, stock, cart_qty)
+        if self._ignore_stock:
+            InfoBar.warning(
+                title='库存不足',
+                content=msg,
+                parent=self, position=InfoBarPosition.TOP, duration=2000)
+            return False  # don't block
+        else:
+            InfoBar.error(
+                title='库存不足',
+                content=msg,
+                parent=self, position=InfoBarPosition.TOP, duration=3000)
+            return True  # block
+
     def _process_barcode(self, barcode):
         if not barcode:
             return
@@ -371,12 +406,8 @@ class SalesInterface(QWidget):
                 break
 
         if in_cart + 1 > stock:
-            InfoBar.error(
-                title='库存不足',
-                content='{} 库存仅 {} 件，购物车已有 {} 件'.format(
-                    product['name'], stock, in_cart),
-                parent=self, position=InfoBarPosition.TOP, duration=3000)
-            return
+            if self._stock_warning(product['name'], stock, in_cart + 1):
+                return
 
         for item in self._cart_items:
             if item['product_id'] == product['id']:
@@ -479,12 +510,9 @@ class SalesInterface(QWidget):
             if delta > 0:
                 product = ProductModel.get_by_id(item['product_id'])
                 if product and new_qty > product['stock_quantity']:
-                    InfoBar.error(
-                        title='库存不足',
-                        content='{} 库存仅 {} 件'.format(
-                            item['name'], product['stock_quantity']),
-                        parent=self, position=InfoBarPosition.TOP, duration=3000)
-                    return
+                    if self._stock_warning(item['name'],
+                                           product['stock_quantity'], new_qty):
+                        return
             item['quantity'] = new_qty
             item['subtotal'] = round(
                 item['unit_price'] * item['quantity'] * item['discount_rate'], 2)
@@ -521,12 +549,9 @@ class SalesInterface(QWidget):
                 # Check stock
                 product = ProductModel.get_by_id(item['product_id'])
                 if product and new_qty > product['stock_quantity']:
-                    InfoBar.error(
-                        title='库存不足',
-                        content='{} 库存仅 {} 件'.format(
-                            item['name'], product['stock_quantity']),
-                        parent=self, position=InfoBarPosition.TOP, duration=3000)
-                    return
+                    if self._stock_warning(item['name'],
+                                           product['stock_quantity'], new_qty):
+                        return
                 item['quantity'] = new_qty
                 item['discount_rate'] = dialog.get_discount_rate()
                 item['subtotal'] = round(
@@ -584,12 +609,10 @@ class SalesInterface(QWidget):
                     parent=self, position=InfoBarPosition.TOP, duration=3000)
                 return
             if item['quantity'] > product['stock_quantity']:
-                InfoBar.error(
-                    title='库存不足',
-                    content='{} 库存仅 {} 件，购物车中有 {} 件'.format(
-                        item['name'], product['stock_quantity'], item['quantity']),
-                    parent=self, position=InfoBarPosition.TOP, duration=4000)
-                return
+                if self._stock_warning(item['name'],
+                                       product['stock_quantity'],
+                                       item['quantity']):
+                    return
 
         total_amount = sum(
             item['unit_price'] * item['quantity'] for item in self._cart_items)
