@@ -29,14 +29,13 @@ class ProductButton(PushButton):
     def __init__(self, product, parent=None):
         super().__init__(parent)
         self.product = product
-        self.setFixedSize(110, 62)
+        self.setFixedSize(130, 72)
         self.setToolTip('{}\n¥{:.2f}'.format(product['name'], product['selling_price']))
 
         # Elide the name if too long
-        name = product['name']
-        fm = QFontMetrics(self.font())
-        max_w = 96  # button width minus padding
-        elided = fm.elidedText(name, Qt.ElideRight, max_w)
+        fm = QFontMetrics(QFont(self.font().family(), 13))
+        max_w = 112  # button width minus padding
+        elided = fm.elidedText(product['name'], Qt.ElideRight, max_w)
         self.setText('{}\n¥{:.2f}'.format(elided, product['selling_price']))
 
         self.setStyleSheet('''
@@ -44,9 +43,9 @@ class ProductButton(PushButton):
                 border: 1px solid #e0e0e0;
                 border-radius: 6px;
                 background: white;
-                font-size: 12px;
-                text-align: left;
-                padding: 6px 7px;
+                font-size: 13px;
+                text-align: center;
+                padding: 6px 8px;
             }
             ProductButton:hover {
                 background: #e3f2fd;
@@ -252,7 +251,7 @@ class SalesInterface(QWidget):
         self.productGridWidget = QWidget()
         self.productGridWidget.setStyleSheet('background: transparent;')
         self.productGrid = QGridLayout(self.productGridWidget)
-        self.productGrid.setSpacing(8)
+        self.productGrid.setSpacing(5)
         self.productGrid.setContentsMargins(0, 0, 0, 0)
         self.productScroll.setWidget(self.productGridWidget)
 
@@ -425,6 +424,7 @@ class SalesInterface(QWidget):
                     background: transparent;
                     border: none;
                     border-radius: 4px;
+                    qproperty-iconSize: 16px 16px;
                 }
                 ToolButton:hover {
                     background: #ffebee;
@@ -433,7 +433,7 @@ class SalesInterface(QWidget):
                     background: #ffcdd2;
                 }
             ''')
-            del_btn.setIconSize(del_btn.size() * 0.55)
+            del_btn.setIcon(FIF.DELETE.icon(color=QColor('#d32f2f')))
             del_btn.clicked.connect(lambda checked, r=row: self._remove_item(r))
             del_widget = QWidget()
             del_layout = QHBoxLayout(del_widget)

@@ -6,13 +6,17 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from PyQt5.QtCore import Qt
+from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
-from app.common.config import APP_NAME
+from app.common.config import APP_NAME, BASE_DIR
 from app.common.database import init_database
 from app.common.backup import BackupManager
 from app.views.login_window import LoginWindow
 from app.views.main_window import MainWindow
+
+ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.ico')
+ICON_PNG = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
 
 def main():
@@ -23,6 +27,11 @@ def main():
     QApplication.setAttribute(Qt.AA_UseHighDpiPixmaps)
 
     app = QApplication(sys.argv)
+
+    # Set application-wide icon (taskbar, title bar, etc.)
+    icon_file = ICON_PATH if os.path.exists(ICON_PATH) else ICON_PNG
+    if os.path.exists(icon_file):
+        app.setWindowIcon(QIcon(icon_file))
 
     # Initialize database
     init_database()

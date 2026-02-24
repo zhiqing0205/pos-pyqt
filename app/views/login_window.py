@@ -38,7 +38,7 @@ class LoginWindow(QWidget):
             LoginWindow {
                 background: qlineargradient(
                     x1:0, y1:0, x2:1, y2:1,
-                    stop:0 #667eea, stop:1 #764ba2
+                    stop:0 #0078D4, stop:1 #005A9E
                 );
             }
         ''')
