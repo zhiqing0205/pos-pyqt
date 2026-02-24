@@ -16,6 +16,7 @@ class BackupManager(QObject):
         self._last_backup_date = None
         self._backup_dir = BACKUP_DIR
         self._backup_hour = BACKUP_HOUR
+        self._backup_minute = 0
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._check_auto_backup)
 
@@ -38,16 +39,21 @@ class BackupManager(QObject):
             hour = SettingsModel.get('backup_hour', '')
             if hour:
                 self._backup_hour = int(hour)
+            minute = SettingsModel.get('backup_minute', '')
+            if minute:
+                self._backup_minute = int(minute)
         except Exception:
             pass
 
-    def update_settings(self, backup_dir=None, backup_hour=None):
+    def update_settings(self, backup_dir=None, backup_hour=None, backup_minute=None):
         """Update backup settings at runtime."""
         if backup_dir:
             self._backup_dir = backup_dir
             os.makedirs(self._backup_dir, exist_ok=True)
         if backup_hour is not None:
             self._backup_hour = backup_hour
+        if backup_minute is not None:
+            self._backup_minute = backup_minute
 
     def should_backup_on_close(self):
         """Check if auto-backup on close is enabled."""
@@ -58,10 +64,11 @@ class BackupManager(QObject):
             return True
 
     def _check_auto_backup(self):
-        """Check if it's time for auto backup (daily at backup_hour)."""
+        """Check if it's time for auto backup (daily at backup_hour:backup_minute)."""
         now = datetime.now()
         today = date.today()
-        if now.hour == self._backup_hour and self._last_backup_date != today:
+        if (now.hour == self._backup_hour and now.minute == self._backup_minute
+                and self._last_backup_date != today):
             self._last_backup_date = today
             self.create_backup(prefix='auto')
 

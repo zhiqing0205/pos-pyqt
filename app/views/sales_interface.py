@@ -11,11 +11,12 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, TransparentPushButton
                             BodyLabel, TitleLabel, CaptionLabel,
                             InfoBar, InfoBarPosition,
                             setFont, FluentIcon as FIF, PillPushButton,
-                            ToolButton)
+                            ToolButton, SmoothScrollArea)
 
 from ..models.product import ProductModel
 from ..dialogs.checkout_dialog import CheckoutDialog
 from ..dialogs.discount_dialog import DiscountDialog
+from ..dialogs.cart_item_dialog import CartItemDialog
 from ..common.auth import AuthManager
 from ..common.signal_bus import signal_bus
 
@@ -29,7 +30,7 @@ class ProductButton(PushButton):
     def __init__(self, product, parent=None):
         super().__init__(parent)
         self.product = product
-        self.setFixedSize(130, 72)
+        self.setFixedSize(130, 58)
         self.setToolTip('{}\n¥{:.2f}'.format(product['name'], product['selling_price']))
 
         # Elide the name if too long
@@ -154,7 +155,7 @@ class SalesInterface(QWidget):
         header.setSectionResizeMode(4, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(5, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(6, QHeaderView.Fixed)
-        self.cartTable.setColumnWidth(0, 40)
+        self.cartTable.setColumnWidth(0, 45)
         self.cartTable.setColumnWidth(3, 120)
         self.cartTable.setColumnWidth(6, 60)
 
@@ -243,10 +244,10 @@ class SalesInterface(QWidget):
         right.addWidget(self.categoryScroll)
 
         # Product grid
-        self.productScroll = QScrollArea()
+        self.productScroll = SmoothScrollArea()
         self.productScroll.setWidgetResizable(True)
         self.productScroll.setFrameShape(QFrame.NoFrame)
-        self.productScroll.setStyleSheet('background: transparent;')
+        self.productScroll.setStyleSheet('QScrollArea { background: transparent; }')
 
         self.productGridWidget = QWidget()
         self.productGridWidget.setStyleSheet('background: transparent;')
@@ -263,6 +264,7 @@ class SalesInterface(QWidget):
         self.discountBtn.clicked.connect(self._on_discount)
         self.clearBtn.clicked.connect(self._on_clear_cart)
         self.checkoutBtn.clicked.connect(self._on_checkout)
+        self.cartTable.doubleClicked.connect(self._on_cart_double_click)
 
     def _init_shortcuts(self):
         QShortcut(QKeySequence(Qt.Key_F12), self, self._on_checkout)
@@ -384,7 +386,9 @@ class SalesInterface(QWidget):
     def _refresh_cart_table(self):
         self.cartTable.setRowCount(len(self._cart_items))
         for i, item in enumerate(self._cart_items):
-            self.cartTable.setItem(i, 0, QTableWidgetItem(str(i + 1)))
+            num_item = QTableWidgetItem(str(i + 1))
+            num_item.setTextAlignment(Qt.AlignCenter)
+            self.cartTable.setItem(i, 0, num_item)
             self.cartTable.setItem(i, 1, QTableWidgetItem(item['name']))
             self.cartTable.setItem(i, 2, QTableWidgetItem('{:.2f}'.format(item['unit_price'])))
 
@@ -473,6 +477,22 @@ class SalesInterface(QWidget):
             if 0 <= row < len(self._cart_items):
                 self._cart_items.pop(row)
         self._refresh_cart_table()
+
+    def _on_cart_double_click(self, index):
+        row = index.row()
+        if row < 0 or row >= len(self._cart_items):
+            return
+        item = self._cart_items[row]
+        dialog = CartItemDialog(item, self.window())
+        if dialog.exec_():
+            action = dialog.get_action()
+            if action == CartItemDialog.RESULT_DELETE:
+                self._remove_item(row)
+            elif action == CartItemDialog.RESULT_DISCOUNT:
+                item['discount_rate'] = dialog.get_discount_rate()
+                item['subtotal'] = round(
+                    item['unit_price'] * item['quantity'] * item['discount_rate'], 2)
+                self._refresh_cart_table()
 
     def _update_summary(self):
         total_qty = sum(item['quantity'] for item in self._cart_items)

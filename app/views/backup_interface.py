@@ -84,10 +84,19 @@ class BackupInterface(QWidget):
         self.hourSpin = SpinBox()
         self.hourSpin.setRange(0, 23)
         self.hourSpin.setValue(2)
-        self.hourSpin.setFixedWidth(100)
+        self.hourSpin.setFixedWidth(120)
         time_row.addWidget(self.hourSpin)
 
-        time_suffix = BodyLabel('时')
+        time_sep = BodyLabel('时')
+        time_row.addWidget(time_sep)
+
+        self.minuteSpin = SpinBox()
+        self.minuteSpin.setRange(0, 59)
+        self.minuteSpin.setValue(0)
+        self.minuteSpin.setFixedWidth(120)
+        time_row.addWidget(self.minuteSpin)
+
+        time_suffix = BodyLabel('分')
         time_row.addWidget(time_suffix)
         time_row.addStretch()
 
@@ -191,6 +200,12 @@ class BackupInterface(QWidget):
         except (ValueError, TypeError):
             self.hourSpin.setValue(2)
 
+        minute = SettingsModel.get('backup_minute', '0')
+        try:
+            self.minuteSpin.setValue(int(minute))
+        except (ValueError, TypeError):
+            self.minuteSpin.setValue(0)
+
         auto = SettingsModel.get('backup_on_close', '1')
         self.autoBackupCheck.setChecked(auto == '1')
 
@@ -202,13 +217,15 @@ class BackupInterface(QWidget):
             os.makedirs(folder, exist_ok=True)
 
         SettingsModel.set('backup_hour', str(self.hourSpin.value()))
+        SettingsModel.set('backup_minute', str(self.minuteSpin.value()))
         SettingsModel.set('backup_on_close',
                           '1' if self.autoBackupCheck.isChecked() else '0')
 
         # Update backup manager with new settings
         self._backup_manager.update_settings(
             backup_dir=folder,
-            backup_hour=self.hourSpin.value()
+            backup_hour=self.hourSpin.value(),
+            backup_minute=self.minuteSpin.value()
         )
 
         InfoBar.success(
