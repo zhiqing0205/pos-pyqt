@@ -5,7 +5,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
-from qfluentwidgets import FluentWindow, NavigationItemPosition
+from qfluentwidgets import FluentWindow, NavigationItemPosition, MessageBox
 from qfluentwidgets import FluentIcon as FIF
 
 from ..common.config import APP_NAME, BASE_DIR
@@ -85,6 +85,13 @@ class MainWindow(FluentWindow):
         self.move(w // 2 - self.width() // 2, h // 2 - self.height() // 2)
 
     def closeEvent(self, event):
+        w = MessageBox('确认退出', '确定要退出程序吗？', self)
+        w.yesButton.setText('确认')
+        w.cancelButton.setText('取消')
+        if not w.exec_():
+            event.ignore()
+            return
+
         if self._backup_manager.should_backup_on_close():
             self._backup_manager.create_backup(prefix='close')
         AuthManager.logout()
