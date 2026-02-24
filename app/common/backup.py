@@ -17,6 +17,7 @@ class BackupManager(QObject):
         self._backup_dir = BACKUP_DIR
         self._backup_hour = BACKUP_HOUR
         self._backup_minute = 0
+        self._max_backups = MAX_BACKUPS
         self._timer = QTimer(self)
         self._timer.timeout.connect(self._check_auto_backup)
 
@@ -42,10 +43,14 @@ class BackupManager(QObject):
             minute = SettingsModel.get('backup_minute', '')
             if minute:
                 self._backup_minute = int(minute)
+            max_b = SettingsModel.get('max_backups', '')
+            if max_b:
+                self._max_backups = int(max_b)
         except Exception:
             pass
 
-    def update_settings(self, backup_dir=None, backup_hour=None, backup_minute=None):
+    def update_settings(self, backup_dir=None, backup_hour=None,
+                        backup_minute=None, max_backups=None):
         """Update backup settings at runtime."""
         if backup_dir:
             self._backup_dir = backup_dir
@@ -54,6 +59,8 @@ class BackupManager(QObject):
             self._backup_hour = backup_hour
         if backup_minute is not None:
             self._backup_minute = backup_minute
+        if max_backups is not None:
+            self._max_backups = max_backups
 
     def should_backup_on_close(self):
         """Check if auto-backup on close is enabled."""
@@ -86,10 +93,10 @@ class BackupManager(QObject):
         return backup_path
 
     def _cleanup_old_backups(self):
-        """Keep only the most recent MAX_BACKUPS backup files."""
+        """Keep only the most recent max_backups backup files."""
         backups = self.list_backups()
-        if len(backups) > MAX_BACKUPS:
-            for old in backups[MAX_BACKUPS:]:
+        if len(backups) > self._max_backups:
+            for old in backups[self._max_backups:]:
                 try:
                     os.remove(old['path'])
                 except OSError:

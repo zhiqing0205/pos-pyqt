@@ -16,7 +16,7 @@ BACKUP_DIR = os.path.join(DATA_DIR, 'backups')
 os.makedirs(BACKUP_DIR, exist_ok=True)
 
 # Backup settings
-MAX_BACKUPS = 7
+MAX_BACKUPS = 720
 BACKUP_CHECK_INTERVAL_MS = 60000  # 60 seconds
 BACKUP_HOUR = 2  # 2:00 AM
 

@@ -13,8 +13,9 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, LineEdit,
                             FluentIcon as FIF, MessageBox, setFont)
 
 from ..common.backup import BackupManager
-from ..common.config import BACKUP_DIR
+from ..common.config import BACKUP_DIR, MAX_BACKUPS
 from ..models.settings import SettingsModel
+from ..common.signal_bus import signal_bus
 
 
 class BackupInterface(QWidget):
@@ -107,6 +108,26 @@ class BackupInterface(QWidget):
         self.autoBackupCheck.setChecked(True)
         sc_layout.addLayout(self._wrap_row(self.autoBackupCheck))
 
+        # Max backups row
+        max_row = QHBoxLayout()
+        max_row.setSpacing(12)
+        max_label = BodyLabel('备份保留数量')
+        max_label.setFixedWidth(100)
+        max_row.addWidget(max_label)
+
+        self.maxBackupsSpin = SpinBox()
+        self.maxBackupsSpin.setRange(1, 9999)
+        self.maxBackupsSpin.setValue(MAX_BACKUPS)
+        self.maxBackupsSpin.setFixedWidth(120)
+        max_row.addWidget(self.maxBackupsSpin)
+
+        max_hint = CaptionLabel('超出数量的旧备份将自动删除')
+        max_hint.setStyleSheet('color: gray;')
+        max_row.addWidget(max_hint)
+        max_row.addStretch()
+
+        sc_layout.addLayout(max_row)
+
         # Save settings button
         save_row = QHBoxLayout()
         save_row.addStretch()
@@ -138,6 +159,9 @@ class BackupInterface(QWidget):
         btn_layout.addWidget(self.exportBtn)
         btn_layout.addWidget(self.importBtn)
         btn_layout.addStretch()
+
+        self.resetDemoBtn = PushButton(FIF.DELETE, '清除演示数据')
+        btn_layout.addWidget(self.resetDemoBtn)
 
         ac_layout.addLayout(btn_layout)
 
@@ -179,6 +203,7 @@ class BackupInterface(QWidget):
         self.backupBtn.clicked.connect(self._on_backup)
         self.exportBtn.clicked.connect(self._on_export)
         self.importBtn.clicked.connect(self._on_import)
+        self.resetDemoBtn.clicked.connect(self._on_reset_demo)
 
     @staticmethod
     def _wrap_row(widget):
@@ -209,6 +234,12 @@ class BackupInterface(QWidget):
         auto = SettingsModel.get('backup_on_close', '1')
         self.autoBackupCheck.setChecked(auto == '1')
 
+        max_b = SettingsModel.get('max_backups', str(MAX_BACKUPS))
+        try:
+            self.maxBackupsSpin.setValue(int(max_b))
+        except (ValueError, TypeError):
+            self.maxBackupsSpin.setValue(MAX_BACKUPS)
+
     def _save_settings(self):
         folder = self.folderEdit.text().strip()
         if folder:
@@ -220,12 +251,14 @@ class BackupInterface(QWidget):
         SettingsModel.set('backup_minute', str(self.minuteSpin.value()))
         SettingsModel.set('backup_on_close',
                           '1' if self.autoBackupCheck.isChecked() else '0')
+        SettingsModel.set('max_backups', str(self.maxBackupsSpin.value()))
 
         # Update backup manager with new settings
         self._backup_manager.update_settings(
             backup_dir=folder,
             backup_hour=self.hourSpin.value(),
-            backup_minute=self.minuteSpin.value()
+            backup_minute=self.minuteSpin.value(),
+            max_backups=self.maxBackupsSpin.value()
         )
 
         InfoBar.success(
@@ -298,3 +331,36 @@ class BackupInterface(QWidget):
                     InfoBar.success(
                         title='导入成功', content='数据库已导入，请重启应用',
                         parent=self, position=InfoBarPosition.TOP, duration=5000)
+
+    def _on_reset_demo(self):
+        w = MessageBox(
+            '清除演示数据',
+            '此操作将删除所有演示数据（交易记录、进货记录、演示用户），'
+            '仅保留管理员账号和商品数据。\n\n确定继续吗？',
+            self.window())
+        w.yesButton.setText('确认清除')
+        w.cancelButton.setText('取消')
+        if w.exec_():
+            from ..common.database import get_connection
+            conn = get_connection()
+            cursor = conn.cursor()
+            try:
+                cursor.execute("DELETE FROM transaction_items")
+                cursor.execute("DELETE FROM transactions")
+                cursor.execute("DELETE FROM stock_in_records")
+                cursor.execute("DELETE FROM users WHERE role != 'admin'")
+                conn.commit()
+                conn.close()
+                InfoBar.success(
+                    title='清除完成',
+                    content='演示数据已清除，系统已恢复为初始状态',
+                    parent=self, position=InfoBarPosition.TOP, duration=3000)
+                signal_bus.transaction_completed.emit()
+                signal_bus.stock_changed.emit()
+                signal_bus.user_changed.emit()
+            except Exception:
+                conn.rollback()
+                conn.close()
+                InfoBar.error(
+                    title='清除失败', content='操作出错，请重试',
+                    parent=self, position=InfoBarPosition.TOP, duration=3000)
