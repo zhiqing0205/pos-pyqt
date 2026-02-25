@@ -12,6 +12,7 @@
 - **结账** — 现金/支付宝/微信支付，自动扣减库存
 - **仪表盘** — 今日/本月销售统计卡片，近7天营业额柱状图，分类销售饼图，支付方式分布，最近交易，热销商品排行，库存预警
 - **商品管理** — 添加、编辑、搜索、删除商品，扫码快速添加/编辑
+- **商品分类** — 分类管理，自定义排序，收银页面分类标签按排序显示
 - **进货管理** — 扫码入库，自动更新库存和进价
 - **销售记录** — 交易历史查询，双击查看详情，支持删除
 - **用户管理** — 管理员/店员角色，启用/禁用/删除账号
@@ -65,6 +66,7 @@ python main.py
 | 销售记录 | ✓ | ✓ |
 | 仪表盘 | ✓ | — |
 | 商品管理 | ✓ | — |
+| 商品分类 | ✓ | — |
 | 进货管理 | ✓ | — |
 | 用户管理 | ✓ | — |
 | 支付设置 | ✓ | — |
@@ -91,6 +93,7 @@ app/
   models/
     user.py                 # 用户模型（级联删除）
     product.py              # 商品模型（级联删除）
+    category.py             # 分类模型
     transaction.py          # 交易模型
     stock_in.py             # 进货模型
     settings.py             # 配置模型
@@ -101,6 +104,7 @@ app/
     sales_interface.py      # 收银页面
     dashboard_interface.py  # 仪表盘
     product_interface.py    # 商品管理
+    category_interface.py   # 商品分类管理
     stock_in_interface.py   # 进货管理
     user_interface.py       # 用户管理
     transaction_interface.py# 销售记录

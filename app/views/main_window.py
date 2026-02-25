@@ -13,6 +13,7 @@ from ..common.auth import AuthManager
 from ..common.backup import BackupManager
 from .sales_interface import SalesInterface
 from .product_interface import ProductInterface
+from .category_interface import CategoryInterface
 from .user_interface import UserInterface
 from .stock_in_interface import StockInInterface
 from .settings_interface import SettingsInterface
@@ -49,6 +50,9 @@ class MainWindow(FluentWindow):
             self.productInterface = ProductInterface(self)
             self.productInterface.setObjectName('product-interface')
 
+            self.categoryInterface = CategoryInterface(self)
+            self.categoryInterface.setObjectName('category-interface')
+
             self.stockInInterface = StockInInterface(self)
             self.stockInInterface.setObjectName('stock-in-interface')
 
@@ -68,6 +72,7 @@ class MainWindow(FluentWindow):
         if AuthManager.is_admin():
             self.addSubInterface(self.dashboardInterface, FIF.HOME, '仪表盘')
             self.addSubInterface(self.productInterface, FIF.TAG, '商品管理')
+            self.addSubInterface(self.categoryInterface, FIF.LABEL, '商品分类')
             self.addSubInterface(self.stockInInterface, FIF.ADD_TO, '进货管理')
             self.addSubInterface(self.userInterface, FIF.PEOPLE, '用户管理')
 

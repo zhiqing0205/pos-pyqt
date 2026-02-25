@@ -38,7 +38,7 @@ def init_database():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             barcode TEXT UNIQUE NOT NULL,
             name TEXT NOT NULL,
-            category TEXT NOT NULL DEFAULT '',
+            category TEXT NOT NULL DEFAULT '其他',
             purchase_price REAL NOT NULL DEFAULT 0,
             selling_price REAL NOT NULL DEFAULT 0,
             stock_quantity INTEGER NOT NULL DEFAULT 0,
@@ -96,6 +96,27 @@ def init_database():
             FOREIGN KEY (operator_id) REFERENCES users(id)
         )
     ''')
+
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS categories (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            sort_order INTEGER NOT NULL DEFAULT 0
+        )
+    ''')
+
+    # Seed default categories if empty
+    cursor.execute("SELECT COUNT(*) FROM categories")
+    if cursor.fetchone()[0] == 0:
+        default_cats = [
+            ('饮料', 1), ('水', 2), ('奶品', 3), ('酒', 4),
+            ('方便面', 5), ('零食', 6), ('日用品', 7), ('其他', 8),
+        ]
+        for name, order in default_cats:
+            cursor.execute(
+                "INSERT INTO categories (name, sort_order) VALUES (?, ?)",
+                (name, order)
+            )
 
     # Seed default admin user if no users exist
     cursor.execute("SELECT COUNT(*) FROM users")

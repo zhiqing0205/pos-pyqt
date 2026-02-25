@@ -14,14 +14,12 @@ from qfluentwidgets import (PushButton, PrimaryPushButton, TransparentPushButton
                             ToolButton, SmoothScrollArea, SwitchButton)
 
 from ..models.product import ProductModel
+from ..models.category import CategoryModel
 from ..dialogs.checkout_dialog import CheckoutDialog
 from ..dialogs.discount_dialog import DiscountDialog
 from ..dialogs.cart_item_dialog import CartItemDialog
 from ..common.auth import AuthManager
 from ..common.signal_bus import signal_bus
-
-# Preferred category display order (listed ones come first, rest alphabetical)
-_CATEGORY_ORDER = ['饮料', '水', '奶品', '酒', '方便面', '零食', '日用品']
 
 
 class ProductButton(PushButton):
@@ -77,6 +75,7 @@ class SalesInterface(QWidget):
         self._load_categories()
 
         signal_bus.product_changed.connect(self._load_categories)
+        signal_bus.category_changed.connect(self._load_categories)
 
         QTimer.singleShot(200, self._install_global_filter)
 
@@ -291,16 +290,10 @@ class SalesInterface(QWidget):
     # ── Category & Product Grid ──
 
     def _sorted_categories(self, categories):
-        """Sort categories: preferred order first, then alphabetical for the rest."""
-        ordered = []
-        remaining = []
-        for cat in _CATEGORY_ORDER:
-            if cat in categories:
-                ordered.append(cat)
-        for cat in categories:
-            if cat not in ordered:
-                remaining.append(cat)
-        remaining.sort()
+        """Sort categories by database sort_order, then alphabetical for unlisted."""
+        db_order = CategoryModel.get_names()
+        ordered = [c for c in db_order if c in categories]
+        remaining = sorted([c for c in categories if c not in db_order])
         return ordered + remaining
 
     def _load_categories(self):

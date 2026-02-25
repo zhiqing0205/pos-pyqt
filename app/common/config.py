@@ -22,4 +22,4 @@ BACKUP_HOUR = 2  # 2:00 AM
 
 # App info
 APP_NAME = '收银系统'
-APP_VERSION = '1.6.2'
+APP_VERSION = '1.8.0'

@@ -20,5 +20,8 @@ class SignalBus(QObject):
     # Emitted when a transaction is completed
     transaction_completed = pyqtSignal()
 
+    # Emitted when categories are updated
+    category_changed = pyqtSignal()
+
 
 signal_bus = SignalBus()

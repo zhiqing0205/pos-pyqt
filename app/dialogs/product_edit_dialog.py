@@ -4,6 +4,8 @@ from PyQt5.QtWidgets import QVBoxLayout
 from qfluentwidgets import (MessageBoxBase, LineEdit, ComboBox, BodyLabel,
                             SubtitleLabel)
 
+from ..models.category import CategoryModel
+
 
 class ProductEditDialog(MessageBoxBase):
     """Dialog for adding or editing a product."""
@@ -46,11 +48,22 @@ class ProductEditDialog(MessageBoxBase):
 
         # Category
         self.viewLayout.addWidget(BodyLabel('分类'))
-        self.categoryEdit = LineEdit()
-        self.categoryEdit.setPlaceholderText('分类（可选）')
+        self.categoryCombo = ComboBox()
+        cat_names = CategoryModel.get_names()
+        self.categoryCombo.addItems(cat_names)
         if is_edit:
-            self.categoryEdit.setText(self._product.get('category', ''))
-        self.viewLayout.addWidget(self.categoryEdit)
+            current = self._product.get('category', '其他')
+            idx = self.categoryCombo.findText(current)
+            if idx >= 0:
+                self.categoryCombo.setCurrentIndex(idx)
+            else:
+                self.categoryCombo.addItem(current)
+                self.categoryCombo.setCurrentIndex(self.categoryCombo.count() - 1)
+        else:
+            idx = self.categoryCombo.findText('其他')
+            if idx >= 0:
+                self.categoryCombo.setCurrentIndex(idx)
+        self.viewLayout.addWidget(self.categoryCombo)
 
         self.viewLayout.addSpacing(5)
 
@@ -118,7 +131,7 @@ class ProductEditDialog(MessageBoxBase):
         self._result_data = {
             'barcode': barcode,
             'name': name,
-            'category': self.categoryEdit.text().strip(),
+            'category': self.categoryCombo.currentText(),
             'purchase_price': purchase_price,
             'selling_price': selling_price,
             'stock_quantity': stock,
