@@ -89,7 +89,7 @@ class MainWindow(FluentWindow):
                 NavigationItemPosition.BOTTOM)
 
         self.addSubInterface(
-            self.profileInterface, FIF.PEOPLE, '个人中心',
+            self.profileInterface, FIF.FINGERPRINT, '个人中心',
             NavigationItemPosition.BOTTOM)
 
     def _init_window(self):
