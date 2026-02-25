@@ -5,7 +5,8 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import QApplication
 
-from qfluentwidgets import FluentWindow, NavigationItemPosition, MessageBox
+from qfluentwidgets import (FluentWindow, NavigationItemPosition, MessageBox,
+                            NavigationAvatarWidget)
 from qfluentwidgets import FluentIcon as FIF
 
 from ..common.config import APP_NAME, BASE_DIR
@@ -20,6 +21,7 @@ from .settings_interface import SettingsInterface
 from .backup_interface import BackupInterface
 from .dashboard_interface import DashboardInterface
 from .transaction_interface import TransactionInterface
+from .profile_interface import ProfileInterface
 
 ICON_PATH = os.path.join(BASE_DIR, 'resources', 'icon.png')
 
@@ -42,6 +44,9 @@ class MainWindow(FluentWindow):
 
         self.transactionInterface = TransactionInterface(self)
         self.transactionInterface.setObjectName('transaction-interface')
+
+        self.profileInterface = ProfileInterface(self._user_info, self)
+        self.profileInterface.setObjectName('profile-interface')
 
         if AuthManager.is_admin():
             self.dashboardInterface = DashboardInterface(self)
@@ -83,6 +88,15 @@ class MainWindow(FluentWindow):
             self.addSubInterface(
                 self.backupInterface, FIF.SAVE, '备份管理',
                 NavigationItemPosition.BOTTOM)
+
+        # Avatar at bottom — click navigates to profile page
+        self.navigationInterface.addWidget(
+            routeKey='avatar',
+            widget=NavigationAvatarWidget(
+                self._user_info['username'], parent=self),
+            onClick=lambda: self.switchTo(self.profileInterface),
+            position=NavigationItemPosition.BOTTOM,
+        )
 
     def _init_window(self):
         role_text = '管理员' if AuthManager.is_admin() else '店员'
